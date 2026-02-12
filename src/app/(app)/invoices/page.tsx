@@ -1,0 +1,172 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { FileText, Plus, Eye, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { invoices as invoicesApi, clients as clientsApi, type Invoice, type Client } from '@/lib/api';
+import { formatCurrency, formatDate } from '@/lib/utils';
+import Link from 'next/link';
+import GenerateInvoiceDialog from '@/components/GenerateInvoiceDialog';
+
+const STATUS_STYLES: Record<string, string> = {
+  draft: 'bg-gray-100 text-gray-700',
+  sent: 'bg-blue-100 text-blue-700',
+  paid: 'bg-green-100 text-green-700',
+  void: 'bg-red-100 text-red-700',
+};
+
+export default function InvoicesPage() {
+  const [invoiceList, setInvoiceList] = useState<Invoice[]>([]);
+  const [clientList, setClientList] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filterClient, setFilterClient] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [generateOpen, setGenerateOpen] = useState(false);
+
+  const loadInvoices = useCallback(async () => {
+    try {
+      const filters: { clientId?: string; status?: string } = {};
+      if (filterClient) filters.clientId = filterClient;
+      if (filterStatus) filters.status = filterStatus;
+      const data = await invoicesApi.list(filters);
+      setInvoiceList(data);
+    } catch (err) {
+      console.error('Failed to load invoices:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [filterClient, filterStatus]);
+
+  useEffect(() => {
+    clientsApi.list().then(setClientList).catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    loadInvoices();
+  }, [loadInvoices]);
+
+  async function handleDelete(id: string) {
+    if (!confirm('Delete this invoice? This will unmark all linked time entries as billed.')) return;
+    try {
+      await invoicesApi.delete(id);
+      loadInvoices();
+    } catch (err) {
+      console.error('Failed to delete invoice:', err);
+    }
+  }
+
+  return (
+    <div>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <FileText className="w-6 h-6" />
+            Invoices
+          </h1>
+          <p className="text-gray-500 mt-1">Manage billing and invoices</p>
+        </div>
+        <Button onClick={() => setGenerateOpen(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          Generate Invoice
+        </Button>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 mb-6">
+        <select
+          value={filterClient}
+          onChange={(e) => setFilterClient(e.target.value)}
+          className="rounded-md border border-gray-300 px-3 py-2 text-sm bg-white"
+        >
+          <option value="">All Clients</option>
+          {clientList.filter(c => c.isActive).map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          className="rounded-md border border-gray-300 px-3 py-2 text-sm bg-white"
+        >
+          <option value="">All Statuses</option>
+          <option value="draft">Draft</option>
+          <option value="sent">Sent</option>
+          <option value="paid">Paid</option>
+          <option value="void">Void</option>
+        </select>
+      </div>
+
+      {/* Invoice Table */}
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+        {loading ? (
+          <div className="p-6 text-center text-gray-500">Loading...</div>
+        ) : invoiceList.length === 0 ? (
+          <div className="p-6 text-center text-gray-500">
+            No invoices found.{' '}
+            <button onClick={() => setGenerateOpen(true)} className="text-blue-600 hover:underline">
+              Generate your first invoice
+            </button>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice #</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Client</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date Issued</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Due Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {invoiceList.map((inv) => (
+                <tr key={inv.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-3 font-medium">{inv.invoiceNumber}</td>
+                  <td className="px-6 py-3 text-gray-600">{inv.client?.name || '-'}</td>
+                  <td className="px-6 py-3 text-gray-600">{formatDate(inv.dateIssued)}</td>
+                  <td className="px-6 py-3 text-gray-600">{inv.dateDue ? formatDate(inv.dateDue) : '-'}</td>
+                  <td className="px-6 py-3">
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[inv.status] || ''}`}>
+                      {inv.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-3 text-right font-medium">
+                    {inv.total != null ? formatCurrency(inv.total) : '-'}
+                  </td>
+                  <td className="px-6 py-3 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Link href={`/invoices/${inv.id}`}>
+                        <Button variant="ghost" size="sm">
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </Link>
+                      {inv.status === 'draft' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(inv.id)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <GenerateInvoiceDialog
+        open={generateOpen}
+        onOpenChange={setGenerateOpen}
+        clients={clientList.filter(c => c.isActive)}
+        onGenerated={loadInvoices}
+      />
+    </div>
+  );
+}
