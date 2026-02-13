@@ -24,6 +24,7 @@ export interface ClientResponse {
   accountHolder: string | null;
   isActive: boolean;
   notes: string | null;
+  defaultHourlyRate: string | null;
 }
 
 export interface JobTypeResponse {

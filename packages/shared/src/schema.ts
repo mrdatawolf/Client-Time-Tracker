@@ -24,6 +24,7 @@ export const clients = pgTable('clients', {
   accountHolder: text('account_holder'),
   isActive: boolean('is_active').notNull().default(true),
   notes: text('notes'),
+  defaultHourlyRate: numeric('default_hourly_rate', { precision: 10, scale: 2 }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

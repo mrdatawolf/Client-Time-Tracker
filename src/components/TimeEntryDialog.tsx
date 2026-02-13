@@ -23,6 +23,8 @@ import {
   jobTypes as jobTypesApi,
   rateTiers as rateTiersApi,
   users as usersApi,
+  clients as clientsApi,
+  settings as settingsApi,
   type JobType,
   type RateTier,
   type User,
@@ -69,10 +71,26 @@ export default function TimeEntryDialog({
         jobTypesApi.list(),
         rateTiersApi.list(),
         admin ? usersApi.list() : Promise.resolve([]),
-      ]).then(([jt, rt, u]) => {
+        // For new entries, fetch the client's rate and the base rate from settings
+        !entry && defaultClientId ? clientsApi.get(defaultClientId) : Promise.resolve(null),
+        !entry ? settingsApi.get().catch(() => ({} as Record<string, string>)) : Promise.resolve(null),
+      ]).then(([jt, rt, u, client, appSettings]) => {
+        const activeRates = rt.filter((r) => r.isActive);
         setJobTypeList(jt.filter((j) => j.isActive));
-        setRateTierList(rt.filter((r) => r.isActive));
+        setRateTierList(activeRates);
         setTechList(u.filter((user) => user.isActive));
+
+        // Auto-select rate tier for new entries
+        if (!entry && activeRates.length > 0) {
+          const targetRate = client?.defaultHourlyRate
+            || (appSettings as Record<string, string>)?.baseHourlyRate
+            || '185';
+          const targetNum = parseFloat(targetRate);
+          const match = activeRates.find((r) => parseFloat(r.amount) === targetNum);
+          if (match) {
+            setRateTierId(match.id);
+          }
+        }
       });
 
       if (entry) {
@@ -92,7 +110,7 @@ export default function TimeEntryDialog({
       }
       setError('');
     }
-  }, [open, entry, defaultDate, admin]);
+  }, [open, entry, defaultDate, defaultClientId, admin]);
 
   const selectedRate = rateTierList.find((r) => r.id === rateTierId);
   const computedTotal = hours && selectedRate

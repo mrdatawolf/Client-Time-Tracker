@@ -21,6 +21,7 @@ export interface Client {
   accountHolder: string | null;
   isActive: boolean;
   notes: string | null;
+  defaultHourlyRate: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -89,13 +90,13 @@ export const clients = {
 
   get: (id: string) => apiClient<Client>(`/api/clients/${id}`),
 
-  create: (data: { name: string; accountHolder?: string; notes?: string }) =>
+  create: (data: { name: string; accountHolder?: string; notes?: string; defaultHourlyRate?: string }) =>
     apiClient<Client>('/api/clients', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  update: (id: string, data: Partial<{ name: string; accountHolder: string; isActive: boolean; notes: string }>) =>
+  update: (id: string, data: Partial<{ name: string; accountHolder: string; isActive: boolean; notes: string; defaultHourlyRate: string | null }>) =>
     apiClient<Client>(`/api/clients/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),

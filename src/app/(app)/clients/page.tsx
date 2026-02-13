@@ -23,6 +23,7 @@ export default function ClientsPage() {
   const [formName, setFormName] = useState('');
   const [formHolder, setFormHolder] = useState('');
   const [formNotes, setFormNotes] = useState('');
+  const [formRate, setFormRate] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -54,6 +55,7 @@ export default function ClientsPage() {
     setFormName('');
     setFormHolder('');
     setFormNotes('');
+    setFormRate('');
     setError('');
     setDialogOpen(true);
   }
@@ -63,6 +65,7 @@ export default function ClientsPage() {
     setFormName(client.name);
     setFormHolder(client.accountHolder || '');
     setFormNotes(client.notes || '');
+    setFormRate(client.defaultHourlyRate || '');
     setError('');
     setDialogOpen(true);
   }
@@ -80,12 +83,14 @@ export default function ClientsPage() {
           name: formName.trim(),
           accountHolder: formHolder.trim() || undefined,
           notes: formNotes.trim() || undefined,
+          defaultHourlyRate: formRate.trim() || null,
         });
       } else {
         await clientsApi.create({
           name: formName.trim(),
           accountHolder: formHolder.trim() || undefined,
           notes: formNotes.trim() || undefined,
+          defaultHourlyRate: formRate.trim() || undefined,
         });
       }
       setDialogOpen(false);
@@ -250,6 +255,18 @@ export default function ClientsPage() {
                 value={formNotes}
                 onChange={(e) => setFormNotes(e.target.value)}
                 placeholder="Optional notes"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="rate">Default Hourly Rate ($)</Label>
+              <Input
+                id="rate"
+                type="number"
+                step="0.01"
+                min="0"
+                value={formRate}
+                onChange={(e) => setFormRate(e.target.value)}
+                placeholder="Leave blank to use base rate from settings"
               />
             </div>
           </div>

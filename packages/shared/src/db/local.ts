@@ -131,6 +131,9 @@ async function initializeSchema(client: PGlite): Promise<void> {
       updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
     );
 
+    -- Migrate: add default_hourly_rate to clients
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS default_hourly_rate NUMERIC(10, 2);
+
     -- Job Types
     CREATE TABLE IF NOT EXISTS job_types (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

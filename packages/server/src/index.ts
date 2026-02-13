@@ -44,8 +44,13 @@ app.get('/health', (c) => {
 // Auth routes (login is public, /me and /change-password use their own auth)
 app.route('/api/auth', authRoutes);
 
-// Auth middleware for all other /api/* routes
-app.use('/api/*', requireAuth());
+// Auth middleware for all /api/* routes except auth routes (which handle their own auth)
+app.use('/api/*', async (c, next) => {
+  if (c.req.path.startsWith('/api/auth')) {
+    return next();
+  }
+  return requireAuth()(c, next);
+});
 
 // Audit logging for write operations (runs after route handlers)
 app.use('/api/*', auditLogger());

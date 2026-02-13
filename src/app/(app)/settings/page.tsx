@@ -15,18 +15,20 @@ import {
   users as usersApi,
   jobTypes as jobTypesApi,
   rateTiers as rateTiersApi,
+  settings as settingsApi,
   type User,
   type JobType,
   type RateTier,
 } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 
-type Tab = 'users' | 'jobTypes' | 'rateTiers';
+type Tab = 'general' | 'users' | 'jobTypes' | 'rateTiers';
 
 export default function SettingsPage() {
-  const [tab, setTab] = useState<Tab>('users');
+  const [tab, setTab] = useState<Tab>('general');
 
   const tabs: { key: Tab; label: string; icon: typeof Users }[] = [
+    { key: 'general', label: 'General', icon: Settings },
     { key: 'users', label: 'Users', icon: Users },
     { key: 'jobTypes', label: 'Job Types', icon: Briefcase },
     { key: 'rateTiers', label: 'Rate Tiers', icon: DollarSign },
@@ -39,7 +41,7 @@ export default function SettingsPage() {
           <Settings className="w-6 h-6" />
           Settings
         </h1>
-        <p className="text-gray-500 mt-1">Manage users, job types, and rate tiers</p>
+        <p className="text-gray-500 mt-1">Manage general settings, users, job types, and rate tiers</p>
       </div>
 
       {/* Tabs */}
@@ -60,9 +62,81 @@ export default function SettingsPage() {
         ))}
       </div>
 
+      {tab === 'general' && <GeneralTab />}
       {tab === 'users' && <UsersTab />}
       {tab === 'jobTypes' && <JobTypesTab />}
       {tab === 'rateTiers' && <RateTiersTab />}
+    </div>
+  );
+}
+
+// ============ General Tab ============
+
+function GeneralTab() {
+  const [baseRate, setBaseRate] = useState('185');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const loadSettings = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await settingsApi.get();
+      if (data.baseHourlyRate) {
+        setBaseRate(data.baseHourlyRate);
+      }
+    } catch (err) {
+      console.error('Failed to load settings:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadSettings(); }, [loadSettings]);
+
+  async function handleSave() {
+    setSaving(true);
+    setSaved(false);
+    try {
+      await settingsApi.update({ baseHourlyRate: baseRate });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      console.error('Failed to save settings:', err);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) {
+    return <div className="p-8 text-center text-gray-500">Loading...</div>;
+  }
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 max-w-lg">
+      <h2 className="text-lg font-semibold text-gray-900 mb-4">Rates</h2>
+      <div className="space-y-4">
+        <div className="space-y-1">
+          <label className="text-sm font-medium">Base Hourly Rate ($)</label>
+          <Input
+            type="number"
+            step="0.01"
+            min="0"
+            value={baseRate}
+            onChange={(e) => setBaseRate(e.target.value)}
+            placeholder="185.00"
+          />
+          <p className="text-xs text-gray-500">
+            Default rate used when a client does not have a specific hourly rate set.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button onClick={handleSave} disabled={saving || !baseRate}>
+            {saving ? 'Saving...' : 'Save'}
+          </Button>
+          {saved && <span className="text-sm text-green-600">Saved</span>}
+        </div>
+      </div>
     </div>
   );
 }
