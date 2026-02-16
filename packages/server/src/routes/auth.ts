@@ -103,4 +103,54 @@ route.post('/change-password', requireAuth(), async (c) => {
   return c.json({ success: true });
 });
 
+// GET /setup-status - Public: check if initial setup is needed
+route.get('/setup-status', async (c) => {
+  const db = await getDb();
+  const userCount = await db.select({ id: users.id }).from(users).limit(1);
+  return c.json({ needsSetup: userCount.length === 0 });
+});
+
+// POST /setup - Public: create the first admin user (only when no users exist)
+route.post('/setup', async (c) => {
+  const db = await getDb();
+
+  // Only allow setup when no users exist
+  const existing = await db.select({ id: users.id }).from(users).limit(1);
+  if (existing.length > 0) {
+    return c.json({ error: 'Setup already completed. Please log in.' }, 403);
+  }
+
+  const body = await c.req.json();
+  const { username, displayName, password } = body;
+
+  if (!username || !displayName || !password) {
+    return c.json({ error: 'Username, display name, and password are required' }, 400);
+  }
+
+  if (password.length < 4) {
+    return c.json({ error: 'Password must be at least 4 characters' }, 400);
+  }
+
+  const passwordHash = await hashPassword(password);
+  const [newUser] = await db.insert(users).values({
+    username: username.trim(),
+    displayName: displayName.trim(),
+    passwordHash,
+    role: 'admin',
+  }).returning();
+
+  const token = createToken({ userId: newUser.id, role: newUser.role });
+
+  return c.json({
+    token,
+    user: {
+      id: newUser.id,
+      username: newUser.username,
+      displayName: newUser.displayName,
+      role: newUser.role,
+      isActive: newUser.isActive,
+    },
+  });
+});
+
 export default route;
