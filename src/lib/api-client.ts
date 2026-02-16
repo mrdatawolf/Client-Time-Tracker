@@ -23,6 +23,15 @@ export async function apiClient<T>(path: string, options?: RequestInit): Promise
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
+
+    // If the server says unauthorized, the token is invalid/expired — force re-login
+    // Skip redirect if already on the login page (e.g. setup-status check)
+    if (res.status === 401 && typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+      localStorage.removeItem('ctt_token');
+      localStorage.removeItem('ctt_user');
+      window.location.href = '/login';
+    }
+
     throw new ApiError(body.error || body.message || res.statusText, res.status);
   }
 
