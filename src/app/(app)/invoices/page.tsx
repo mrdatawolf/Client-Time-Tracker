@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { FileText, Plus, Eye, Trash2 } from 'lucide-react';
+import { FileText, Plus, Eye, Trash2, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { invoices as invoicesApi, clients as clientsApi, type Invoice, type Client } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
@@ -142,6 +142,14 @@ export default function InvoicesPage() {
                           <Eye className="w-4 h-4" />
                         </Button>
                       </Link>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => invoicesApi.downloadPdf(inv.id)}
+                        title="Download PDF"
+                      >
+                        <Download className="w-4 h-4" />
+                      </Button>
                       {inv.status === 'draft' && (
                         <Button
                           variant="ghost"

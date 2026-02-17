@@ -19,6 +19,8 @@ export interface Client {
   id: string;
   name: string;
   accountHolder: string | null;
+  phone: string | null;
+  mailingAddress: string | null;
   isActive: boolean;
   notes: string | null;
   defaultHourlyRate: string | null;
@@ -90,13 +92,13 @@ export const clients = {
 
   get: (id: string) => apiClient<Client>(`/api/clients/${id}`),
 
-  create: (data: { name: string; accountHolder?: string; notes?: string; defaultHourlyRate?: string }) =>
+  create: (data: { name: string; accountHolder?: string; phone?: string; mailingAddress?: string; notes?: string; defaultHourlyRate?: string }) =>
     apiClient<Client>('/api/clients', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  update: (id: string, data: Partial<{ name: string; accountHolder: string; isActive: boolean; notes: string; defaultHourlyRate: string | null }>) =>
+  update: (id: string, data: Partial<{ name: string; accountHolder: string; phone: string; mailingAddress: string; isActive: boolean; notes: string; defaultHourlyRate: string | null }>) =>
     apiClient<Client>(`/api/clients/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -291,6 +293,39 @@ export const invoices = {
 
   delete: (id: string) =>
     apiClient<{ success: boolean }>(`/api/invoices/${id}`, { method: 'DELETE' }),
+
+  updateLineItem: (invoiceId: string, lineId: string, data: Partial<{ description: string; hours: string; rate: string }>) =>
+    apiClient<InvoiceLineItem>(`/api/invoices/${invoiceId}/line-items/${lineId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  addLineItem: (invoiceId: string, data: { description: string; hours: string; rate: string }) =>
+    apiClient<InvoiceLineItem>(`/api/invoices/${invoiceId}/line-items`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  deleteLineItem: (invoiceId: string, lineId: string) =>
+    apiClient<{ success: boolean }>(`/api/invoices/${invoiceId}/line-items/${lineId}`, { method: 'DELETE' }),
+
+  downloadPdf: async (id: string) => {
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3701';
+    const token = typeof window !== 'undefined' ? localStorage.getItem('ctt_token') : null;
+    const res = await fetch(`${API_BASE}/api/invoices/${id}/pdf`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error('Failed to download PDF');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = res.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || `invoice-${id}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
 };
 
 // --- Payments ---
@@ -412,7 +447,7 @@ export const reports = {
     const token = typeof window !== 'undefined' ? localStorage.getItem('ctt_token') : '';
     if (token) params.set('token', token);
     const qs = params.toString();
-    const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3701';
     return `${base}/api/reports/export${qs ? `?${qs}` : ''}`;
   },
 };
@@ -516,5 +551,116 @@ export const settings = {
     apiClient<{ success: boolean }>('/api/settings', {
       method: 'PUT',
       body: JSON.stringify(data),
+    }),
+};
+
+// --- Projects ---
+
+export type ProjectStatus = 'in_progress' | 'waiting_on_client' | 'need_to_reach_out' | 'needs_call' | 'on_hold' | 'completed';
+
+export interface Project {
+  id: string;
+  clientId: string;
+  name: string;
+  status: ProjectStatus;
+  assignedTo: string | null;
+  note: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  client?: Client;
+}
+
+export const projects = {
+  list: () => apiClient<Project[]>('/api/projects'),
+
+  create: (data: { clientId: string; name: string; status?: ProjectStatus; assignedTo?: string; note?: string }) =>
+    apiClient<Project>('/api/projects', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: string, data: Partial<{ name: string; status: ProjectStatus; assignedTo: string | null; note: string | null; isActive: boolean; clientId: string }>) =>
+    apiClient<Project>(`/api/projects/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: string) =>
+    apiClient<{ success: boolean }>(`/api/projects/${id}`, { method: 'DELETE' }),
+};
+
+// --- Client Chat Logs ---
+
+export interface ClientChatLog {
+  id?: string;
+  clientId: string;
+  content: string;
+  updatedAt?: string;
+}
+
+export const clientChatLogs = {
+  get: (clientId: string) =>
+    apiClient<ClientChatLog>(`/api/client-chat-logs/${clientId}`),
+
+  save: (clientId: string, content: string) =>
+    apiClient<ClientChatLog>(`/api/client-chat-logs/${clientId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ content }),
+    }),
+};
+
+// --- Supabase Sync ---
+
+export interface SupabaseConfig {
+  enabled: boolean;
+  supabaseUrl: string;
+  supabaseAnonKey: string;
+  supabaseServiceKey: string;
+  databaseUrl: string;
+  lastSyncAt: string | null;
+  instanceId: string;
+}
+
+export interface SyncStatus {
+  enabled: boolean;
+  lastSyncAt: string | null;
+  instanceId: string;
+  pendingCount: number;
+  state: 'idle' | 'syncing' | 'offline' | 'error' | 'disabled';
+}
+
+export const supabaseSync = {
+  getConfig: () =>
+    apiClient<SupabaseConfig>('/api/supabase/config'),
+
+  updateConfig: (data: Partial<SupabaseConfig>) =>
+    apiClient<{ success: boolean; instanceId: string }>('/api/supabase/config', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  testConnection: () =>
+    apiClient<{ success: boolean; message: string }>('/api/supabase/test-connection', {
+      method: 'POST',
+    }),
+
+  setupSchema: () =>
+    apiClient<{ success: boolean; message: string }>('/api/supabase/setup-schema', {
+      method: 'POST',
+    }),
+
+  getStatus: () =>
+    apiClient<SyncStatus>('/api/supabase/status'),
+
+  sync: () =>
+    apiClient<{ success: boolean; message: string }>('/api/supabase/sync', {
+      method: 'POST',
+    }),
+
+  initialSync: (direction: 'push' | 'pull' | 'merge') =>
+    apiClient<{ success: boolean; message: string; stats: { pushed: number; pulled: number } }>('/api/supabase/initial-sync', {
+      method: 'POST',
+      body: JSON.stringify({ direction }),
     }),
 };

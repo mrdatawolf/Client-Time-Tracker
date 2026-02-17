@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Settings</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0; padding: 24px;
+      background: #f9fafb; color: #111827;
+    }
+    h2 { margin: 0 0 16px; font-size: 18px; }
+    .field { margin-bottom: 16px; }
+    label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+    input[type="text"] {
+      width: 100%; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px;
+      font-size: 14px; box-sizing: border-box;
+    }
+    input[type="text"]:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.2); }
+    .hint { font-size: 12px; color: #6b7280; margin-top: 4px; }
+    .buttons { display: flex; gap: 8px; margin-top: 24px; }
+    button {
+      padding: 8px 16px; border-radius: 6px; font-size: 14px; cursor: pointer; border: 1px solid #d1d5db;
+      background: white; color: #374151;
+    }
+    button:hover { background: #f3f4f6; }
+    button.primary { background: #2563eb; color: white; border-color: #2563eb; }
+    button.primary:hover { background: #1d4ed8; }
+    .version { font-size: 12px; color: #9ca3af; margin-top: 24px; }
+    .status { margin-top: 8px; font-size: 13px; padding: 8px; border-radius: 6px; display: none; }
+    .status.success { display: block; background: #ecfdf5; color: #065f46; }
+    .status.info { display: block; background: #eff6ff; color: #1e40af; }
+  </style>
+</head>
+<body>
+  <h2>Settings</h2>
+
+  <div class="field">
+    <label>Server URL</label>
+    <input type="text" id="serverUrl" placeholder="http://localhost:3700">
+    <p class="hint">For local mode, use http://localhost:3700. For remote server, enter its URL.</p>
+  </div>
+
+  <div id="statusMsg" class="status"></div>
+
+  <div class="buttons">
+    <button class="primary" onclick="save()">Save</button>
+    <button onclick="window.electronAPI.closeSettings()">Cancel</button>
+    <button onclick="restart()">Save &amp; Restart</button>
+  </div>
+
+  <p class="version" id="versionText"></p>
+
+  <script>
+    async function load() {
+      const url = await window.electronAPI.getServerUrl();
+      document.getElementById('serverUrl').value = url || '';
+      const version = await window.electronAPI.getVersion();
+      document.getElementById('versionText').textContent = `Version ${version}`;
+    }
+
+    async function save() {
+      const url = document.getElementById('serverUrl').value.trim();
+      if (url) {
+        await window.electronAPI.setServerUrl(url);
+        const msg = document.getElementById('statusMsg');
+        msg.textContent = 'Settings saved. Restart the app for changes to take effect.';
+        msg.className = 'status success';
+      }
+    }
+
+    async function restart() {
+      await save();
+      window.electronAPI.restartApp();
+    }
+
+    load();
+  </script>
+</body>
+</html>

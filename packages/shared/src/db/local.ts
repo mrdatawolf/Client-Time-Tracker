@@ -134,6 +134,10 @@ async function initializeSchema(client: PGlite): Promise<void> {
     -- Migrate: add default_hourly_rate to clients
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS default_hourly_rate NUMERIC(10, 2);
 
+    -- Migrate: add phone and mailing_address to clients
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS phone TEXT;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS mailing_address TEXT;
+
     -- Job Types
     CREATE TABLE IF NOT EXISTS job_types (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -244,6 +248,121 @@ async function initializeSchema(client: PGlite): Promise<void> {
       value TEXT NOT NULL,
       updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
     );
+
+    -- Projects
+    CREATE TABLE IF NOT EXISTS projects (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      client_id UUID NOT NULL REFERENCES clients(id),
+      name TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'in_progress',
+      assigned_to TEXT,
+      note TEXT,
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+    );
+
+    -- Client Chat Logs
+    CREATE TABLE IF NOT EXISTS client_chat_logs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      client_id UUID NOT NULL REFERENCES clients(id) UNIQUE,
+      content TEXT NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+    );
+
+    -- Sync Changelog (local only, tracks changes for Supabase sync)
+    CREATE TABLE IF NOT EXISTS sync_changelog (
+      id SERIAL PRIMARY KEY,
+      table_name TEXT NOT NULL,
+      record_id TEXT NOT NULL,
+      operation TEXT NOT NULL,
+      changed_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+      synced BOOLEAN DEFAULT false NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sync_changelog_unsynced
+      ON sync_changelog (synced) WHERE synced = false;
+
+    -- Trigger function: logs changes to sync_changelog
+    -- Skips logging when app.syncing is set (during sync pulls to avoid loops)
+    CREATE OR REPLACE FUNCTION sync_changelog_trigger() RETURNS trigger AS $$
+    BEGIN
+      IF current_setting('app.syncing', true) = 'true' THEN
+        IF TG_OP = 'DELETE' THEN RETURN OLD; ELSE RETURN NEW; END IF;
+      END IF;
+
+      IF TG_OP = 'DELETE' THEN
+        INSERT INTO sync_changelog (table_name, record_id, operation)
+        VALUES (TG_TABLE_NAME, OLD.id::text, 'DELETE');
+        RETURN OLD;
+      ELSE
+        INSERT INTO sync_changelog (table_name, record_id, operation)
+        VALUES (TG_TABLE_NAME, NEW.id::text, TG_OP);
+        RETURN NEW;
+      END IF;
+    END;
+    $$ LANGUAGE plpgsql;
+
+    -- Attach sync triggers to all data tables (skip audit_log and app_settings)
+    DROP TRIGGER IF EXISTS sync_track_users ON users;
+    CREATE TRIGGER sync_track_users
+      AFTER INSERT OR UPDATE OR DELETE ON users
+      FOR EACH ROW EXECUTE FUNCTION sync_changelog_trigger();
+
+    DROP TRIGGER IF EXISTS sync_track_clients ON clients;
+    CREATE TRIGGER sync_track_clients
+      AFTER INSERT OR UPDATE OR DELETE ON clients
+      FOR EACH ROW EXECUTE FUNCTION sync_changelog_trigger();
+
+    DROP TRIGGER IF EXISTS sync_track_job_types ON job_types;
+    CREATE TRIGGER sync_track_job_types
+      AFTER INSERT OR UPDATE OR DELETE ON job_types
+      FOR EACH ROW EXECUTE FUNCTION sync_changelog_trigger();
+
+    DROP TRIGGER IF EXISTS sync_track_rate_tiers ON rate_tiers;
+    CREATE TRIGGER sync_track_rate_tiers
+      AFTER INSERT OR UPDATE OR DELETE ON rate_tiers
+      FOR EACH ROW EXECUTE FUNCTION sync_changelog_trigger();
+
+    DROP TRIGGER IF EXISTS sync_track_invoices ON invoices;
+    CREATE TRIGGER sync_track_invoices
+      AFTER INSERT OR UPDATE OR DELETE ON invoices
+      FOR EACH ROW EXECUTE FUNCTION sync_changelog_trigger();
+
+    DROP TRIGGER IF EXISTS sync_track_time_entries ON time_entries;
+    CREATE TRIGGER sync_track_time_entries
+      AFTER INSERT OR UPDATE OR DELETE ON time_entries
+      FOR EACH ROW EXECUTE FUNCTION sync_changelog_trigger();
+
+    DROP TRIGGER IF EXISTS sync_track_invoice_line_items ON invoice_line_items;
+    CREATE TRIGGER sync_track_invoice_line_items
+      AFTER INSERT OR UPDATE OR DELETE ON invoice_line_items
+      FOR EACH ROW EXECUTE FUNCTION sync_changelog_trigger();
+
+    DROP TRIGGER IF EXISTS sync_track_payments ON payments;
+    CREATE TRIGGER sync_track_payments
+      AFTER INSERT OR UPDATE OR DELETE ON payments
+      FOR EACH ROW EXECUTE FUNCTION sync_changelog_trigger();
+
+    DROP TRIGGER IF EXISTS sync_track_partner_splits ON partner_splits;
+    CREATE TRIGGER sync_track_partner_splits
+      AFTER INSERT OR UPDATE OR DELETE ON partner_splits
+      FOR EACH ROW EXECUTE FUNCTION sync_changelog_trigger();
+
+    DROP TRIGGER IF EXISTS sync_track_partner_payments ON partner_payments;
+    CREATE TRIGGER sync_track_partner_payments
+      AFTER INSERT OR UPDATE OR DELETE ON partner_payments
+      FOR EACH ROW EXECUTE FUNCTION sync_changelog_trigger();
+
+    DROP TRIGGER IF EXISTS sync_track_projects ON projects;
+    CREATE TRIGGER sync_track_projects
+      AFTER INSERT OR UPDATE OR DELETE ON projects
+      FOR EACH ROW EXECUTE FUNCTION sync_changelog_trigger();
+
+    DROP TRIGGER IF EXISTS sync_track_client_chat_logs ON client_chat_logs;
+    CREATE TRIGGER sync_track_client_chat_logs
+      AFTER INSERT OR UPDATE OR DELETE ON client_chat_logs
+      FOR EACH ROW EXECUTE FUNCTION sync_changelog_trigger();
   `);
 }
 

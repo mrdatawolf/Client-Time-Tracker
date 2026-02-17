@@ -1,0 +1,77 @@
+{
+  "appId": "com.clienttimetracker.app",
+  "productName": "Client Time Tracker",
+  "directories": {
+    "app": "electron-app",
+    "output": "dist-electron",
+    "buildResources": "build"
+  },
+  "files": [
+    "**/*"
+  ],
+  "extraResources": [
+    {
+      "from": "dist-server/web/server.js",
+      "to": "server/web/server.js"
+    },
+    {
+      "from": "dist-server/web/package.json",
+      "to": "server/web/package.json"
+    },
+    {
+      "from": "dist-server/web/.next",
+      "to": "server/web/.next",
+      "filter": [
+        "**/*",
+        "!**/nul",
+        "!**/con",
+        "!**/prn",
+        "!**/aux"
+      ]
+    },
+    {
+      "from": "dist-server/web/node_modules",
+      "to": "server/web/node_modules",
+      "filter": [
+        "**/*",
+        "!**/nul",
+        "!**/con",
+        "!**/prn",
+        "!**/aux"
+      ]
+    },
+    {
+      "from": "dist-server/api-server.js",
+      "to": "server/api-server.js"
+    },
+    {
+      "from": "dist-server/package.json",
+      "to": "server/package.json"
+    },
+    {
+      "from": "dist-server/node_modules",
+      "to": "server/node_modules",
+      "filter": [
+        "**/*",
+        "!**/nul",
+        "!**/con",
+        "!**/prn",
+        "!**/aux"
+      ]
+    }
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": [
+          "x64"
+        ]
+      }
+    ]
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true
+  }
+}

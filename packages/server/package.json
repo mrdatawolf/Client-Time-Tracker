@@ -11,10 +11,12 @@
   "dependencies": {
     "@ctt/shared": "workspace:*",
     "@hono/node-server": "^1.13.8",
+    "@types/pdfkit": "^0.17.5",
     "bcryptjs": "^3.0.3",
     "drizzle-orm": "^0.45.1",
     "hono": "^4.7.6",
-    "jsonwebtoken": "^9.0.3"
+    "jsonwebtoken": "^9.0.3",
+    "pdfkit": "^0.17.2"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

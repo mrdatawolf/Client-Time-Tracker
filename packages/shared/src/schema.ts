@@ -22,6 +22,8 @@ export const clients = pgTable('clients', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: text('name').notNull().unique(),
   accountHolder: text('account_holder'),
+  phone: text('phone'),
+  mailingAddress: text('mailing_address'),
   isActive: boolean('is_active').notNull().default(true),
   notes: text('notes'),
   defaultHourlyRate: numeric('default_hourly_rate', { precision: 10, scale: 2 }),
@@ -43,6 +45,29 @@ export const rateTiers = pgTable('rate_tiers', {
   label: text('label'),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// ============================================================================
+// PROJECTS & CHAT LOGS
+// ============================================================================
+
+export const projects = pgTable('projects', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  clientId: uuid('client_id').notNull().references(() => clients.id),
+  name: text('name').notNull(),
+  status: text('status').notNull().default('in_progress'),
+  assignedTo: text('assigned_to'),
+  note: text('note'),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const clientChatLogs = pgTable('client_chat_logs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  clientId: uuid('client_id').notNull().references(() => clients.id).unique(),
+  content: text('content').notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
 // ============================================================================

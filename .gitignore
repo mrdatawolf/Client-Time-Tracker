@@ -8,7 +8,6 @@ node_modules
 out/
 
 # production
-build
 dist
 
 # misc
@@ -33,3 +32,11 @@ data/
 # editor
 .vscode/
 .idea/
+
+# build artifacts
+dist-electron/
+dist-server/
+temp-server-build/
+.node-portable/
+distribute/
+distribute_server/

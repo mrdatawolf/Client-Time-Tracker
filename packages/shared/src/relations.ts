@@ -11,6 +11,8 @@ import {
   partnerSplits,
   partnerPayments,
   auditLog,
+  projects,
+  clientChatLogs,
 } from './schema';
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -20,9 +22,11 @@ export const usersRelations = relations(users, ({ many }) => ({
   paymentsTo: many(partnerPayments, { relationName: 'toPartner' }),
 }));
 
-export const clientsRelations = relations(clients, ({ many }) => ({
+export const clientsRelations = relations(clients, ({ many, one }) => ({
   timeEntries: many(timeEntries),
   invoices: many(invoices),
+  projects: many(projects),
+  chatLog: one(clientChatLogs, { fields: [clients.id], references: [clientChatLogs.clientId] }),
 }));
 
 export const timeEntriesRelations = relations(timeEntries, ({ one }) => ({
@@ -60,4 +64,12 @@ export const partnerPaymentsRelations = relations(partnerPayments, ({ one }) => 
 
 export const auditLogRelations = relations(auditLog, ({ one }) => ({
   user: one(users, { fields: [auditLog.userId], references: [users.id] }),
+}));
+
+export const projectsRelations = relations(projects, ({ one }) => ({
+  client: one(clients, { fields: [projects.clientId], references: [clients.id] }),
+}));
+
+export const clientChatLogsRelations = relations(clientChatLogs, ({ one }) => ({
+  client: one(clients, { fields: [clientChatLogs.clientId], references: [clients.id] }),
 }));
