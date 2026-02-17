@@ -17,16 +17,19 @@ Full-stack time tracking application for client billing. Monorepo using pnpm wor
 ```
 /                         # Next.js frontend (root workspace)
 ├── src/app/              # App Router pages
-│   ├── login/            # Public login page
+│   ├── login/            # Public login page (+ first-time setup flow)
 │   └── (app)/            # Protected route group (auth-guarded layout)
 │       ├── clients/
 │       ├── time-entry/
-│       ├── invoices/
+│       ├── invoices/      # List + [id] detail (inline editable)
+│       ├── projects/      # Project tracker grouped by client
 │       ├── reports/
 │       ├── partner/
 │       ├── audit-log/
 │       └── settings/
 ├── src/lib/              # Frontend utilities (api-client, helpers)
+│   ├── api-client.ts     # Fetch wrapper with JWT + 401 auto-redirect
+│   └── api.ts            # Typed API namespaces for all endpoints
 ├── src/components/       # UI components (Radix-based)
 ├── packages/server/      # Hono API server (@ctt/server)
 │   └── src/
@@ -38,7 +41,7 @@ Full-stack time tracking application for client billing. Monorepo using pnpm wor
     └── src/
         ├── schema.ts     # Drizzle database schema
         ├── relations.ts  # Drizzle relation definitions
-        ├── db/           # PGlite database setup
+        ├── db/           # PGlite database setup + migrations
         └── types/        # Shared TypeScript types
 ```
 
@@ -73,6 +76,12 @@ Defined in `.env.local` at project root:
 
 - `apiClient<T>(path, options)` - fetch wrapper that prepends `API_BASE` and attaches the JWT token
 - Throws `ApiError` on non-2xx responses
+- Auto-redirects to `/login` on 401 (clears stale token from localStorage)
+
+### First-Time Setup
+
+If no users exist in the database, the login page shows a "Create Your Account" form.
+Endpoints: `GET /api/auth/setup-status`, `POST /api/auth/setup`
 
 ### Hono Middleware Order (server `index.ts`)
 
@@ -88,3 +97,24 @@ Uses PGlite (embedded Postgres via WASM). Schema defined with Drizzle ORM in
 `packages/shared/src/schema.ts`. No external database server needed.
 
 **NEVER delete, drop, recreate, or reset the database or its tables without explicitly telling the user first and getting confirmation.** The database contains real client/billing data. Schema changes must always use additive migrations (`ALTER TABLE ... ADD COLUMN IF NOT EXISTS`), never destructive ones. Do not run `pnpm db:seed` unless the user specifically asks — it may overwrite existing data.
+
+### Projects & Chat Logs
+
+Lightweight project tracker for seeing where client work is stalled at a glance.
+
+- **Tables**: `projects` (client_id, name, status, assigned_to, note, is_active) and `client_chat_logs` (client_id, content — one per client for pasted Telegram history)
+- **Statuses**: `in_progress`, `waiting_on_client`, `need_to_reach_out`, `needs_call`, `on_hold`, `completed`
+- **Routes**: `packages/server/src/routes/projects.ts`, `packages/server/src/routes/client-chat-logs.ts`
+- **Frontend**: `src/app/(app)/projects/page.tsx` — grouped by client, inline status editing, side panel for chat logs
+- **Dashboard**: Shows last 5 recently updated projects on the main dashboard
+
+### Invoices & PDF Generation
+
+- **PDF generation**: `GET /api/invoices/:id/pdf` using `pdfkit` — generates a PDF matching the company invoice template (see `Examples/Invoice - Client 0001.docx`)
+- **Company settings** (stored in `app_settings`): `companyName` (default: "Lost Coast IT"), `invoicePayableTo` (default: "Patrick, Moon\n6336 Purdue Dr. Eureka, Ca 95503")
+- **Inline editing**: Invoice detail page supports editing line items (description, hours, rate), adding/deleting lines, and editing invoice fields (number, dates, notes) for draft/sent invoices
+- **Line item endpoints**: `PUT /:invoiceId/line-items/:lineId`, `POST /:invoiceId/line-items`, `DELETE /:invoiceId/line-items/:lineId`
+
+### Client Fields
+
+Clients have: `name`, `accountHolder`, `phone`, `mailingAddress`, `notes`, `defaultHourlyRate`. Phone and mailing address are used on PDF invoices.

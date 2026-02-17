@@ -16,6 +16,7 @@ import {
   Briefcase,
   Handshake,
   ScrollText,
+  FolderKanban,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { clearToken, getUser } from '@/lib/api-client';
@@ -24,6 +25,7 @@ const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/time-entry', label: 'Time Entry', icon: Clock },
   { href: '/clients', label: 'Clients', icon: Briefcase },
+  { href: '/projects', label: 'Projects', icon: FolderKanban },
   { href: '/invoices', label: 'Invoices', icon: FileText },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
 ];

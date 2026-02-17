@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, FileText, DollarSign, Trash2 } from 'lucide-react';
+import { ArrowLeft, FileText, DollarSign, Trash2, Download, Plus, Pencil, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,6 +17,7 @@ import {
   invoices as invoicesApi,
   payments as paymentsApi,
   type Invoice,
+  type InvoiceLineItem,
   type Payment,
 } from '@/lib/api';
 import { formatCurrency, formatDate, toISODate } from '@/lib/utils';
@@ -46,6 +47,23 @@ export default function InvoiceDetailPage() {
   const [loading, setLoading] = useState(true);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
 
+  // Editing state for invoice header fields
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+
+  // Line item editing
+  const [editingLineId, setEditingLineId] = useState<string | null>(null);
+  const [editLineDesc, setEditLineDesc] = useState('');
+  const [editLineHours, setEditLineHours] = useState('');
+  const [editLineRate, setEditLineRate] = useState('');
+  const [savingLine, setSavingLine] = useState(false);
+
+  // Add line item
+  const [addingLine, setAddingLine] = useState(false);
+  const [newLineDesc, setNewLineDesc] = useState('');
+  const [newLineHours, setNewLineHours] = useState('');
+  const [newLineRate, setNewLineRate] = useState('');
+
   // Payment form state
   const [payAmount, setPayAmount] = useState('');
   const [payDate, setPayDate] = useState('');
@@ -73,6 +91,98 @@ export default function InvoiceDetailPage() {
     loadInvoice();
   }, [loadInvoice]);
 
+  // --- Invoice field editing ---
+  function startEditField(field: string, currentValue: string) {
+    setEditingField(field);
+    setEditValue(currentValue);
+  }
+
+  async function saveField(field: string) {
+    if (!editValue.trim()) return;
+    try {
+      await invoicesApi.update(id, { [field]: editValue.trim() });
+      setEditingField(null);
+      loadInvoice();
+    } catch (err) {
+      console.error('Failed to update field:', err);
+    }
+  }
+
+  function cancelEditField() {
+    setEditingField(null);
+    setEditValue('');
+  }
+
+  // --- Line item editing ---
+  function startEditLine(line: InvoiceLineItem) {
+    setEditingLineId(line.id);
+    setEditLineDesc(line.description);
+    setEditLineHours(String(Number(line.hours)));
+    setEditLineRate(String(Number(line.rate)));
+  }
+
+  async function saveLineEdit() {
+    if (!editingLineId || !editLineDesc.trim()) return;
+    setSavingLine(true);
+    try {
+      await invoicesApi.updateLineItem(id, editingLineId, {
+        description: editLineDesc.trim(),
+        hours: editLineHours,
+        rate: editLineRate,
+      });
+      setEditingLineId(null);
+      loadInvoice();
+    } catch (err) {
+      console.error('Failed to update line item:', err);
+    } finally {
+      setSavingLine(false);
+    }
+  }
+
+  function cancelLineEdit() {
+    setEditingLineId(null);
+  }
+
+  // --- Add line item ---
+  function openAddLine() {
+    setAddingLine(true);
+    setNewLineDesc('');
+    setNewLineHours('1');
+    // Default rate from last line item if available
+    const lastLine = invoice?.lineItems?.[invoice.lineItems.length - 1];
+    setNewLineRate(lastLine ? String(Number(lastLine.rate)) : '185');
+  }
+
+  async function saveNewLine() {
+    if (!newLineDesc.trim() || !newLineHours || !newLineRate) return;
+    setSavingLine(true);
+    try {
+      await invoicesApi.addLineItem(id, {
+        description: newLineDesc.trim(),
+        hours: newLineHours,
+        rate: newLineRate,
+      });
+      setAddingLine(false);
+      loadInvoice();
+    } catch (err) {
+      console.error('Failed to add line item:', err);
+    } finally {
+      setSavingLine(false);
+    }
+  }
+
+  // --- Delete line item ---
+  async function handleDeleteLine(lineId: string) {
+    if (!confirm('Delete this line item?')) return;
+    try {
+      await invoicesApi.deleteLineItem(id, lineId);
+      loadInvoice();
+    } catch (err) {
+      console.error('Failed to delete line item:', err);
+    }
+  }
+
+  // --- Status / Delete ---
   async function handleStatusChange(newStatus: string) {
     try {
       await invoicesApi.update(id, { status: newStatus });
@@ -92,6 +202,7 @@ export default function InvoiceDetailPage() {
     }
   }
 
+  // --- Payments ---
   function openPaymentDialog() {
     const remaining = (invoice?.total || 0) - totalPaid;
     setPayAmount(remaining > 0 ? remaining.toFixed(2) : '');
@@ -157,6 +268,53 @@ export default function InvoiceDetailPage() {
   const totalPaid = paymentList.reduce((sum, p) => sum + Number(p.amount), 0);
   const remaining = (invoice.total || 0) - totalPaid;
   const transitions = STATUS_TRANSITIONS[invoice.status] || [];
+  const isEditable = invoice.status === 'draft' || invoice.status === 'sent';
+
+  // Inline editable field helper
+  function renderEditableField(
+    field: string,
+    label: string,
+    value: string,
+    displayValue: string,
+    type: string = 'text',
+  ) {
+    if (editingField === field) {
+      return (
+        <div className="flex items-center gap-1">
+          <Input
+            type={type}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            className="h-7 text-sm w-40"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') saveField(field);
+              if (e.key === 'Escape') cancelEditField();
+            }}
+          />
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => saveField(field)}>
+            <Check className="w-3 h-3 text-green-600" />
+          </Button>
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={cancelEditField}>
+            <X className="w-3 h-3 text-gray-400" />
+          </Button>
+        </div>
+      );
+    }
+    return (
+      <div className="flex items-center gap-1 group">
+        <span>{displayValue}</span>
+        {isEditable && (
+          <button
+            onClick={() => startEditField(field, value)}
+            className="opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <Pencil className="w-3 h-3 text-gray-400 hover:text-gray-600" />
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -174,7 +332,7 @@ export default function InvoiceDetailPage() {
             <FileText className="w-6 h-6 text-gray-400" />
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
-                {invoice.invoiceNumber}
+                {renderEditableField('invoiceNumber', 'Invoice #', invoice.invoiceNumber, invoice.invoiceNumber)}
               </h1>
               <p className="text-gray-500">{invoice.client?.name || 'Unknown Client'}</p>
             </div>
@@ -185,6 +343,14 @@ export default function InvoiceDetailPage() {
             </span>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => invoicesApi.downloadPdf(id)}
+            >
+              <Download className="w-4 h-4 mr-1" />
+              PDF
+            </Button>
             {transitions.map((t) => (
               <Button
                 key={t.value}
@@ -237,25 +403,61 @@ export default function InvoiceDetailPage() {
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="text-sm text-gray-500 mb-1">Dates</div>
-          <div className="text-sm">
-            <div>Issued: {formatDate(invoice.dateIssued)}</div>
-            {invoice.dateDue && <div>Due: {formatDate(invoice.dateDue)}</div>}
+          <div className="text-sm space-y-0.5">
+            <div>Issued: {renderEditableField('dateIssued', 'Issued', invoice.dateIssued, formatDate(invoice.dateIssued), 'date')}</div>
+            <div>Due: {renderEditableField('dateDue', 'Due', invoice.dateDue || '', invoice.dateDue ? formatDate(invoice.dateDue) : 'Not set', 'date')}</div>
           </div>
         </div>
       </div>
 
       {/* Notes */}
-      {invoice.notes && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-          <div className="text-sm font-medium text-yellow-800 mb-1">Notes</div>
-          <div className="text-sm text-yellow-700">{invoice.notes}</div>
-        </div>
-      )}
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+        <div className="text-sm font-medium text-yellow-800 mb-1">Notes</div>
+        {editingField === 'notes' ? (
+          <div className="flex items-start gap-2">
+            <textarea
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              className="flex-1 text-sm border border-yellow-300 rounded p-2 bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400"
+              rows={3}
+              autoFocus
+            />
+            <div className="flex flex-col gap-1">
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => saveField('notes')}>
+                <Check className="w-3 h-3 text-green-600" />
+              </Button>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={cancelEditField}>
+                <X className="w-3 h-3 text-gray-400" />
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-start gap-1 group">
+            <div className="text-sm text-yellow-700 flex-1">
+              {invoice.notes || <span className="text-yellow-400 italic">No notes</span>}
+            </div>
+            {isEditable && (
+              <button
+                onClick={() => startEditField('notes', invoice.notes || '')}
+                className="opacity-0 group-hover:opacity-100 transition-opacity mt-0.5"
+              >
+                <Pencil className="w-3 h-3 text-yellow-600 hover:text-yellow-800" />
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Line Items */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden mb-6">
-        <div className="px-6 py-4 border-b border-gray-200">
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900">Line Items</h2>
+          {isEditable && !addingLine && (
+            <Button size="sm" variant="outline" onClick={openAddLine}>
+              <Plus className="w-4 h-4 mr-1" />
+              Add Line
+            </Button>
+          )}
         </div>
         {!invoice.lineItems || invoice.lineItems.length === 0 ? (
           <div className="p-6 text-center text-gray-500">No line items</div>
@@ -264,28 +466,183 @@ export default function InvoiceDetailPage() {
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Hours</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Rate</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase w-24">Hours</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase w-28">Rate</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase w-28">Amount</th>
+                {isEditable && (
+                  <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase w-20">Actions</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {invoice.lineItems.map((line) => {
-                const lineTotal = Number(line.hours) * Number(line.rate);
+                const isEditingThis = editingLineId === line.id;
+                const lineTotal = isEditingThis
+                  ? (parseFloat(editLineHours) || 0) * (parseFloat(editLineRate) || 0)
+                  : Number(line.hours) * Number(line.rate);
+
+                if (isEditingThis) {
+                  return (
+                    <tr key={line.id} className="bg-blue-50/50">
+                      <td className="px-6 py-2">
+                        <Input
+                          value={editLineDesc}
+                          onChange={(e) => setEditLineDesc(e.target.value)}
+                          className="h-8 text-sm"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveLineEdit();
+                            if (e.key === 'Escape') cancelLineEdit();
+                          }}
+                        />
+                      </td>
+                      <td className="px-6 py-2">
+                        <Input
+                          type="number"
+                          step="0.25"
+                          min="0"
+                          value={editLineHours}
+                          onChange={(e) => setEditLineHours(e.target.value)}
+                          className="h-8 text-sm text-right w-20 ml-auto"
+                        />
+                      </td>
+                      <td className="px-6 py-2">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={editLineRate}
+                          onChange={(e) => setEditLineRate(e.target.value)}
+                          className="h-8 text-sm text-right w-24 ml-auto"
+                        />
+                      </td>
+                      <td className="px-6 py-2 text-right font-medium text-gray-500">
+                        {formatCurrency(lineTotal)}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <div className="flex items-center justify-end gap-0.5">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            onClick={saveLineEdit}
+                            disabled={savingLine}
+                          >
+                            <Check className="w-3.5 h-3.5 text-green-600" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            onClick={cancelLineEdit}
+                          >
+                            <X className="w-3.5 h-3.5 text-gray-400" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }
+
                 return (
-                  <tr key={line.id}>
+                  <tr key={line.id} className="group hover:bg-gray-50">
                     <td className="px-6 py-3 text-gray-600">{line.description}</td>
                     <td className="px-6 py-3 text-right">{Number(line.hours).toFixed(2)}h</td>
                     <td className="px-6 py-3 text-right">{formatCurrency(Number(line.rate))}</td>
                     <td className="px-6 py-3 text-right font-medium">{formatCurrency(lineTotal)}</td>
+                    {isEditable && (
+                      <td className="px-3 py-3 text-right">
+                        <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            onClick={() => startEditLine(line)}
+                          >
+                            <Pencil className="w-3 h-3 text-gray-400" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            onClick={() => handleDeleteLine(line.id)}
+                          >
+                            <Trash2 className="w-3 h-3 text-red-400" />
+                          </Button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
+
+              {/* Add new line row */}
+              {addingLine && (
+                <tr className="bg-green-50/50">
+                  <td className="px-6 py-2">
+                    <Input
+                      value={newLineDesc}
+                      onChange={(e) => setNewLineDesc(e.target.value)}
+                      placeholder="Description of work..."
+                      className="h-8 text-sm"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') saveNewLine();
+                        if (e.key === 'Escape') setAddingLine(false);
+                      }}
+                    />
+                  </td>
+                  <td className="px-6 py-2">
+                    <Input
+                      type="number"
+                      step="0.25"
+                      min="0"
+                      value={newLineHours}
+                      onChange={(e) => setNewLineHours(e.target.value)}
+                      className="h-8 text-sm text-right w-20 ml-auto"
+                    />
+                  </td>
+                  <td className="px-6 py-2">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={newLineRate}
+                      onChange={(e) => setNewLineRate(e.target.value)}
+                      className="h-8 text-sm text-right w-24 ml-auto"
+                    />
+                  </td>
+                  <td className="px-6 py-2 text-right font-medium text-gray-500">
+                    {formatCurrency((parseFloat(newLineHours) || 0) * (parseFloat(newLineRate) || 0))}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <div className="flex items-center justify-end gap-0.5">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={saveNewLine}
+                        disabled={savingLine}
+                      >
+                        <Check className="w-3.5 h-3.5 text-green-600" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={() => setAddingLine(false)}
+                      >
+                        <X className="w-3.5 h-3.5 text-gray-400" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              )}
             </tbody>
             <tfoot>
               <tr className="bg-gray-50 border-t border-gray-200">
-                <td colSpan={3} className="px-6 py-3 text-right font-medium text-gray-700">Total</td>
-                <td className="px-6 py-3 text-right font-bold text-gray-900">
+                <td colSpan={isEditable ? 4 : 3} className="px-6 py-3 text-right font-medium text-gray-700">Total</td>
+                <td className={`px-6 py-3 text-right font-bold text-gray-900 ${isEditable ? '' : ''}`}>
                   {formatCurrency(invoice.total || 0)}
                 </td>
               </tr>

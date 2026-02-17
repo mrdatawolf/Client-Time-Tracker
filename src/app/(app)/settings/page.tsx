@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Settings, Users, Briefcase, DollarSign, Plus, Pencil, Trash2, Key } from 'lucide-react';
+import { Settings, Users, Briefcase, DollarSign, Plus, Pencil, Trash2, Key, Cloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -21,8 +21,9 @@ import {
   type RateTier,
 } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
+import SupabaseTab from './supabase-tab';
 
-type Tab = 'general' | 'users' | 'jobTypes' | 'rateTiers';
+type Tab = 'general' | 'users' | 'jobTypes' | 'rateTiers' | 'supabase';
 
 export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>('general');
@@ -32,6 +33,7 @@ export default function SettingsPage() {
     { key: 'users', label: 'Users', icon: Users },
     { key: 'jobTypes', label: 'Job Types', icon: Briefcase },
     { key: 'rateTiers', label: 'Rate Tiers', icon: DollarSign },
+    { key: 'supabase', label: 'Supabase Sync', icon: Cloud },
   ];
 
   return (
@@ -66,6 +68,7 @@ export default function SettingsPage() {
       {tab === 'users' && <UsersTab />}
       {tab === 'jobTypes' && <JobTypesTab />}
       {tab === 'rateTiers' && <RateTiersTab />}
+      {tab === 'supabase' && <SupabaseTab />}
     </div>
   );
 }
@@ -226,7 +229,7 @@ function UsersTab() {
       await usersApi.update(resetPwUser.id, { displayName: resetPwUser.displayName } as never);
       // The users route accepts password in the PUT body
       const token = localStorage.getItem('ctt_token');
-      const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3701';
       await fetch(`${base}/api/users/${resetPwUser.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

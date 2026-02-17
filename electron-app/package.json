@@ -1,0 +1,9 @@
+{
+  "name": "client-time-tracker",
+  "version": "0.1.0",
+  "description": "Client Time Tracker",
+  "main": "main.js",
+  "author": "",
+  "license": "ISC",
+  "dependencies": {}
+}

@@ -20,6 +20,10 @@ import reportRoutes from './routes/reports';
 import settingsRoutes from './routes/settings';
 import auditLogRoutes from './routes/audit-log';
 import migrateRoutes from './routes/migrate';
+import projectRoutes from './routes/projects';
+import clientChatLogRoutes from './routes/client-chat-logs';
+import supabaseRoutes from './routes/supabase';
+import { startSyncScheduler } from '@ctt/shared/db/sync-scheduler';
 
 const app = new Hono<AppEnv>();
 
@@ -29,7 +33,7 @@ app.use('*', cors({
   origin: (origin) => {
     // Allow any origin for LAN access
     if (origin) return origin;
-    return 'http://localhost:3000';
+    return 'http://localhost:3700';
   },
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization'],
@@ -68,9 +72,12 @@ app.route('/api/reports', reportRoutes);
 app.route('/api/settings', settingsRoutes);
 app.route('/api/audit-log', auditLogRoutes);
 app.route('/api/migrate', migrateRoutes);
+app.route('/api/projects', projectRoutes);
+app.route('/api/client-chat-logs', clientChatLogRoutes);
+app.route('/api/supabase', supabaseRoutes);
 
 // Start the server
-const port = parseInt(process.env.API_PORT || '3001', 10);
+const port = parseInt(process.env.API_PORT || '3701', 10);
 const hostname = process.env.API_HOST || '0.0.0.0';
 
 console.log(`Starting Time Tracker API server on ${hostname}:${port}...`);
@@ -81,6 +88,9 @@ serve({
   hostname,
 }, (info) => {
   console.log(`Time Tracker API running at http://${hostname}:${info.port}`);
+
+  // Start Supabase sync scheduler (no-op if not configured)
+  startSyncScheduler();
 });
 
 export default app;

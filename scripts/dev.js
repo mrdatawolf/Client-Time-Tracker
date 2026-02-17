@@ -38,7 +38,7 @@ startProcess('api', 'pnpm', ['--filter', '@ctt/server', 'dev'], root);
 
 // Start Next.js frontend (slight delay to let API start first)
 setTimeout(() => {
-  startProcess('web', 'pnpm', ['dev', '--hostname', '0.0.0.0'], root, { PORT: '3000' });
+  startProcess('web', 'pnpm', ['dev', '--hostname', '0.0.0.0'], root, { PORT: '3700' });
 }, 1000);
 
 // Handle cleanup

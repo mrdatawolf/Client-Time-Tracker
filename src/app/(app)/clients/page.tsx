@@ -22,6 +22,8 @@ export default function ClientsPage() {
   const [editing, setEditing] = useState<Client | null>(null);
   const [formName, setFormName] = useState('');
   const [formHolder, setFormHolder] = useState('');
+  const [formPhone, setFormPhone] = useState('');
+  const [formAddress, setFormAddress] = useState('');
   const [formNotes, setFormNotes] = useState('');
   const [formRate, setFormRate] = useState('');
   const [saving, setSaving] = useState(false);
@@ -54,6 +56,8 @@ export default function ClientsPage() {
     setEditing(null);
     setFormName('');
     setFormHolder('');
+    setFormPhone('');
+    setFormAddress('');
     setFormNotes('');
     setFormRate('');
     setError('');
@@ -64,6 +68,8 @@ export default function ClientsPage() {
     setEditing(client);
     setFormName(client.name);
     setFormHolder(client.accountHolder || '');
+    setFormPhone(client.phone || '');
+    setFormAddress(client.mailingAddress || '');
     setFormNotes(client.notes || '');
     setFormRate(client.defaultHourlyRate || '');
     setError('');
@@ -82,6 +88,8 @@ export default function ClientsPage() {
         await clientsApi.update(editing.id, {
           name: formName.trim(),
           accountHolder: formHolder.trim() || undefined,
+          phone: formPhone.trim() || undefined,
+          mailingAddress: formAddress.trim() || undefined,
           notes: formNotes.trim() || undefined,
           defaultHourlyRate: formRate.trim() || null,
         });
@@ -89,6 +97,8 @@ export default function ClientsPage() {
         await clientsApi.create({
           name: formName.trim(),
           accountHolder: formHolder.trim() || undefined,
+          phone: formPhone.trim() || undefined,
+          mailingAddress: formAddress.trim() || undefined,
           notes: formNotes.trim() || undefined,
           defaultHourlyRate: formRate.trim() || undefined,
         });
@@ -247,6 +257,26 @@ export default function ClientsPage() {
                 onChange={(e) => setFormHolder(e.target.value)}
                 placeholder="e.g. Patrick"
               />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone</Label>
+                <Input
+                  id="phone"
+                  value={formPhone}
+                  onChange={(e) => setFormPhone(e.target.value)}
+                  placeholder="e.g. (707) 555-1234"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="address">Mailing Address</Label>
+                <Input
+                  id="address"
+                  value={formAddress}
+                  onChange={(e) => setFormAddress(e.target.value)}
+                  placeholder="e.g. 123 Main St, Eureka CA"
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="notes">Notes</Label>

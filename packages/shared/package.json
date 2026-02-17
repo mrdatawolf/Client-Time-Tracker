@@ -7,14 +7,21 @@
   "exports": {
     ".": "./src/index.ts",
     "./db": "./src/db/index.ts",
+    "./db/supabase-config": "./src/db/supabase-config.ts",
+    "./db/sync-changelog": "./src/db/sync-changelog.ts",
+    "./db/sync-engine": "./src/db/sync-engine.ts",
+    "./db/sync-scheduler": "./src/db/sync-scheduler.ts",
+    "./db/supabase-client": "./src/db/supabase-client.ts",
     "./schema": "./src/schema.ts",
     "./types": "./src/types/index.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.3.15",
-    "drizzle-orm": "^0.45.1"
+    "drizzle-orm": "^0.45.1",
+    "pg": "^8.13.0"
   },
   "devDependencies": {
+    "@types/pg": "^8.11.0",
     "typescript": "^5"
   }
 }

@@ -19,7 +19,7 @@ route.get('/', async (c) => {
 route.post('/', async (c) => {
   const db = await getDb();
   const body = await c.req.json();
-  const { name, accountHolder, notes, defaultHourlyRate } = body;
+  const { name, accountHolder, phone, mailingAddress, notes, defaultHourlyRate } = body;
 
   if (!name) {
     return c.json({ error: 'Client name is required' }, 400);
@@ -35,6 +35,8 @@ route.post('/', async (c) => {
   const [client] = await db.insert(clients).values({
     name,
     accountHolder: accountHolder || null,
+    phone: phone || null,
+    mailingAddress: mailingAddress || null,
     notes: notes || null,
     defaultHourlyRate: defaultHourlyRate || null,
   }).returning();
@@ -63,11 +65,13 @@ route.put('/:id', async (c) => {
   const db = await getDb();
   const id = c.req.param('id');
   const body = await c.req.json();
-  const { name, accountHolder, isActive, notes, defaultHourlyRate } = body;
+  const { name, accountHolder, phone, mailingAddress, isActive, notes, defaultHourlyRate } = body;
 
   const updateData: Record<string, unknown> = { updatedAt: new Date() };
   if (name !== undefined) updateData.name = name;
   if (accountHolder !== undefined) updateData.accountHolder = accountHolder;
+  if (phone !== undefined) updateData.phone = phone;
+  if (mailingAddress !== undefined) updateData.mailingAddress = mailingAddress;
   if (isActive !== undefined) updateData.isActive = isActive;
   if (notes !== undefined) updateData.notes = notes;
   if (defaultHourlyRate !== undefined) updateData.defaultHourlyRate = defaultHourlyRate;
