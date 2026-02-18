@@ -19,7 +19,9 @@
     "electron:start": "electron electron-app",
     "electron:build": "node scripts/sync-version.js && electron-builder --config electron-builder.json",
     "server:installer": "node scripts/build-server-installer.js",
+    "server:installer:linux": "node scripts/build-linux-server-packages.js",
     "build:all": "pnpm run clean && pnpm run build && pnpm run build:server && pnpm run build:standalone && pnpm run electron:build && pnpm run server:installer && node scripts/copy-to-distribute.js",
+    "build:linux": "pnpm run clean && pnpm run build && pnpm run build:server && pnpm run build:standalone && pnpm run electron:build && pnpm run server:installer:linux && node scripts/copy-to-distribute.js",
     "clean": "node -e \"const fs=require('fs'); ['dist-electron','dist-server','temp-server-build'].forEach(d=>{if(fs.existsSync(d)){fs.rmSync(d,{recursive:true,force:true});console.log('Cleaned: '+d)}})\""
   },
   "dependencies": {

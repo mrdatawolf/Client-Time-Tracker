@@ -40,3 +40,4 @@ temp-server-build/
 .node-portable/
 distribute/
 distribute_server/
+Examples/

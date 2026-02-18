@@ -76,6 +76,38 @@ function main() {
     console.log('Warning: No server Setup exe found in dist-electron');
   }
 
+  // Find and copy Linux Electron packages (.rpm, .deb)
+  const linuxClientPackages = files.filter(f =>
+    (f.endsWith('.rpm') || f.endsWith('.deb')) && !f.includes('server')
+  );
+
+  for (const pkg of linuxClientPackages) {
+    if (!fs.existsSync(DISTRIBUTE_DIR)) {
+      fs.mkdirSync(DISTRIBUTE_DIR, { recursive: true });
+    }
+    const srcPath = path.join(DIST_ELECTRON_DIR, pkg);
+    const destPath = path.join(DISTRIBUTE_DIR, pkg);
+    fs.copyFileSync(srcPath, destPath);
+    console.log(`Linux Client: ${pkg}`);
+    console.log(`  -> ${DISTRIBUTE_DIR}`);
+  }
+
+  // Find and copy Linux server packages (.rpm, .deb with "server" in name)
+  const linuxServerPackages = files.filter(f =>
+    (f.endsWith('.rpm') || f.endsWith('.deb')) && f.includes('server')
+  );
+
+  for (const pkg of linuxServerPackages) {
+    if (!fs.existsSync(DISTRIBUTE_SERVER_DIR)) {
+      fs.mkdirSync(DISTRIBUTE_SERVER_DIR, { recursive: true });
+    }
+    const srcPath = path.join(DIST_ELECTRON_DIR, pkg);
+    const destPath = path.join(DISTRIBUTE_SERVER_DIR, pkg);
+    fs.copyFileSync(srcPath, destPath);
+    console.log(`Linux Server: ${pkg}`);
+    console.log(`  -> ${DISTRIBUTE_SERVER_DIR}`);
+  }
+
   console.log('');
   console.log('========================================');
   console.log('  Distribution complete!');
