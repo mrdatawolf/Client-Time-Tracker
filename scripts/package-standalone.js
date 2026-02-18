@@ -338,7 +338,29 @@ process.on('SIGTERM', cleanup);
 `;
   fs.writeFileSync(path.join(DIST_DIR, 'start.cjs'), startJs);
 
-  // 8. Create start-server.bat
+  // 8. Create start-server.sh (Linux launcher)
+  console.log('Creating start-server.sh...');
+  const shContent = `#!/bin/bash
+echo ""
+echo "========================================"
+echo "  Client Time Tracker Server"
+echo "  Version: ${version}"
+echo "========================================"
+echo ""
+echo "  Starting servers..."
+echo "    API:  http://localhost:3701"
+echo "    Web:  http://localhost:3700"
+echo ""
+echo "  Press Ctrl+C to stop"
+echo "========================================"
+echo ""
+
+cd "$(dirname "$0")"
+node start.cjs
+`;
+  fs.writeFileSync(path.join(DIST_DIR, 'start-server.sh'), shContent, { mode: 0o755 });
+
+  // 9. Create start-server.bat
   console.log('Creating start-server.bat...');
   const batContent = `@echo off
 title Client Time Tracker Server v${version}
