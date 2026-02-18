@@ -60,7 +60,9 @@
       ]
     }
   ],
+  "icon": "build/icon.png",
   "win": {
+    "icon": "build/icon.png",
     "target": [
       {
         "target": "nsis",
@@ -72,9 +74,13 @@
   },
   "nsis": {
     "oneClick": false,
-    "allowToChangeInstallationDirectory": true
+    "allowToChangeInstallationDirectory": true,
+    "installerIcon": "build/icon.ico",
+    "uninstallerIcon": "build/icon.ico",
+    "installerHeaderIcon": "build/icon.ico"
   },
   "linux": {
+    "icon": "build/icon.png",
     "target": [
       {
         "target": "rpm",
@@ -91,8 +97,10 @@
     ],
     "category": "Office",
     "desktop": {
-      "Name": "Client Time Tracker",
-      "Comment": "Time tracking application for client billing"
+      "entry": {
+        "Name": "Client Time Tracker",
+        "Comment": "Time tracking application for client billing"
+      }
     }
   },
   "rpm": {
