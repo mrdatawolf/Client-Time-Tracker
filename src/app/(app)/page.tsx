@@ -30,8 +30,9 @@ export default function Dashboard() {
       sunday.setDate(monday.getDate() + 6);
       const weekEnd = toISODate(sunday);
 
-      const [allEntries, clientList, allProjects] = await Promise.all([
+      const [allEntries, unbilledEntries, clientList, allProjects] = await Promise.all([
         timeEntriesApi.list({ dateFrom: weekStart, dateTo: weekEnd }),
+        timeEntriesApi.list({ isBilled: false }),
         clientsApi.list(),
         projectsApi.list(),
       ]);
@@ -43,17 +44,16 @@ export default function Dashboard() {
       // Week's hours
       setWeekHours(allEntries.reduce((sum, e) => sum + parseFloat(e.hours), 0));
 
-      // Unbilled total
-      const unbilled = allEntries.filter((e) => !e.isBilled);
+      // Unbilled total (all unbilled, not just this week)
       setUnbilledTotal(
-        unbilled.reduce((sum, e) => sum + (e.total ? parseFloat(e.total) : 0), 0)
+        unbilledEntries.reduce((sum, e) => sum + (e.total ? parseFloat(e.total) : 0), 0)
       );
 
       // Active clients
       setClientCount(clientList.filter((c) => c.isActive).length);
 
-      // Recent entries (last 10)
-      setRecentEntries(allEntries.slice(0, 10));
+      // Unbilled entries for the table
+      setRecentEntries(unbilledEntries);
 
       // Recent projects (last 5 by updatedAt, active only)
       const sorted = allProjects
@@ -170,13 +170,13 @@ export default function Dashboard() {
 
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Recent Time Entries</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Unbilled Entries</h2>
         </div>
         {loading ? (
           <div className="p-6 text-center text-gray-500">Loading...</div>
         ) : recentEntries.length === 0 ? (
           <div className="p-6 text-center text-gray-500">
-            No time entries this week.{' '}
+            No unbilled entries.{' '}
             <Link href="/time-entry" className="text-blue-600 hover:underline">
               Add your first entry
             </Link>

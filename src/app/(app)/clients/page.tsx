@@ -12,7 +12,14 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { clients as clientsApi, type Client } from '@/lib/api';
+import { clients as clientsApi, users as usersApi, type Client, type User } from '@/lib/api';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function ClientsPage() {
   const [clientList, setClientList] = useState<Client[]>([]);
@@ -21,18 +28,24 @@ export default function ClientsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
   const [formName, setFormName] = useState('');
-  const [formHolder, setFormHolder] = useState('');
+  const [formHolderId, setFormHolderId] = useState('');
   const [formPhone, setFormPhone] = useState('');
   const [formAddress, setFormAddress] = useState('');
   const [formNotes, setFormNotes] = useState('');
   const [formRate, setFormRate] = useState('');
+  const [formPayableTo, setFormPayableTo] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [partners, setPartners] = useState<User[]>([]);
 
   const loadClients = useCallback(async () => {
     try {
-      const data = await clientsApi.list();
+      const [data, allUsers] = await Promise.all([
+        clientsApi.list(),
+        usersApi.list(),
+      ]);
       setClientList(data);
+      setPartners(allUsers.filter((u) => u.role === 'partner'));
     } catch (err) {
       console.error('Failed to load clients:', err);
     } finally {
@@ -44,9 +57,17 @@ export default function ClientsPage() {
     loadClients();
   }, [loadClients]);
 
+  function getHolderName(client: Client) {
+    if (client.accountHolderId) {
+      const p = partners.find((u) => u.id === client.accountHolderId);
+      if (p) return p.displayName;
+    }
+    return client.accountHolder || '-';
+  }
+
   const filtered = clientList.filter((c) =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
-    (c.accountHolder || '').toLowerCase().includes(search.toLowerCase())
+    getHolderName(c).toLowerCase().includes(search.toLowerCase())
   );
 
   const activeClients = filtered.filter((c) => c.isActive);
@@ -55,11 +76,12 @@ export default function ClientsPage() {
   function openCreate() {
     setEditing(null);
     setFormName('');
-    setFormHolder('');
+    setFormHolderId('');
     setFormPhone('');
     setFormAddress('');
     setFormNotes('');
     setFormRate('');
+    setFormPayableTo('');
     setError('');
     setDialogOpen(true);
   }
@@ -67,11 +89,12 @@ export default function ClientsPage() {
   function openEdit(client: Client) {
     setEditing(client);
     setFormName(client.name);
-    setFormHolder(client.accountHolder || '');
+    setFormHolderId(client.accountHolderId || '');
     setFormPhone(client.phone || '');
     setFormAddress(client.mailingAddress || '');
     setFormNotes(client.notes || '');
     setFormRate(client.defaultHourlyRate || '');
+    setFormPayableTo(client.invoicePayableTo || '');
     setError('');
     setDialogOpen(true);
   }
@@ -84,23 +107,28 @@ export default function ClientsPage() {
     setSaving(true);
     setError('');
     try {
+      const holderUser = partners.find((p) => p.id === formHolderId);
       if (editing) {
         await clientsApi.update(editing.id, {
           name: formName.trim(),
-          accountHolder: formHolder.trim() || undefined,
+          accountHolderId: formHolderId || null,
+          accountHolder: holderUser?.displayName || undefined,
           phone: formPhone.trim() || undefined,
           mailingAddress: formAddress.trim() || undefined,
           notes: formNotes.trim() || undefined,
           defaultHourlyRate: formRate.trim() || null,
+          invoicePayableTo: formPayableTo.trim() || null,
         });
       } else {
         await clientsApi.create({
           name: formName.trim(),
-          accountHolder: formHolder.trim() || undefined,
+          accountHolderId: formHolderId || null,
+          accountHolder: holderUser?.displayName || undefined,
           phone: formPhone.trim() || undefined,
           mailingAddress: formAddress.trim() || undefined,
           notes: formNotes.trim() || undefined,
           defaultHourlyRate: formRate.trim() || undefined,
+          invoicePayableTo: formPayableTo.trim() || undefined,
         });
       }
       setDialogOpen(false);
@@ -178,7 +206,7 @@ export default function ClientsPage() {
               {activeClients.map((client) => (
                 <tr key={client.id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium">{client.name}</td>
-                  <td className="px-4 py-3 text-gray-600">{client.accountHolder || '-'}</td>
+                  <td className="px-4 py-3 text-gray-600">{getHolderName(client)}</td>
                   <td className="px-4 py-3 text-gray-500 max-w-xs truncate">{client.notes || '-'}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
@@ -212,7 +240,7 @@ export default function ClientsPage() {
                   {inactiveClients.map((client) => (
                     <tr key={client.id} className="border-b border-gray-100 bg-gray-50/50 opacity-60">
                       <td className="px-4 py-3">{client.name}</td>
-                      <td className="px-4 py-3">{client.accountHolder || '-'}</td>
+                      <td className="px-4 py-3">{getHolderName(client)}</td>
                       <td className="px-4 py-3">{client.notes || '-'}</td>
                       <td className="px-4 py-3 text-right">
                         <Button variant="ghost" size="sm" onClick={() => handleReactivate(client)}>
@@ -251,12 +279,19 @@ export default function ClientsPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="holder">Account Holder</Label>
-              <Input
-                id="holder"
-                value={formHolder}
-                onChange={(e) => setFormHolder(e.target.value)}
-                placeholder="e.g. Patrick"
-              />
+              <Select value={formHolderId || '__none__'} onValueChange={(v) => setFormHolderId(v === '__none__' ? '' : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a partner..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
+                  {partners.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.displayName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -298,6 +333,20 @@ export default function ClientsPage() {
                 onChange={(e) => setFormRate(e.target.value)}
                 placeholder="Leave blank to use base rate from settings"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="payableTo">Invoice &quot;Payable To&quot; Override</Label>
+              <textarea
+                id="payableTo"
+                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                rows={3}
+                value={formPayableTo}
+                onChange={(e) => setFormPayableTo(e.target.value)}
+                placeholder="Leave blank to use global default"
+              />
+              <p className="text-xs text-gray-500">
+                Overrides the global &quot;Payable To&quot; on invoices for this client.
+              </p>
             </div>
           </div>
           <DialogFooter>

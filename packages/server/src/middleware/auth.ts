@@ -2,6 +2,13 @@ import { MiddlewareHandler } from 'hono';
 import { verifyToken } from '../lib/jwt';
 import type { AppEnv } from '../types';
 
+export type UserRole = 'partner' | 'admin' | 'basic';
+
+/** Returns true if the role is admin or higher (admin or partner) */
+export function isAtLeastAdmin(role: UserRole): boolean {
+  return role === 'partner' || role === 'admin';
+}
+
 export const requireAuth = (): MiddlewareHandler<AppEnv> => {
   return async (c, next) => {
     const authHeader = c.req.header('Authorization');
@@ -33,8 +40,17 @@ export const requireAuth = (): MiddlewareHandler<AppEnv> => {
 
 export const requireAdmin = (): MiddlewareHandler<AppEnv> => {
   return async (c, next) => {
-    if (c.get('userRole') !== 'admin') {
+    if (!isAtLeastAdmin(c.get('userRole'))) {
       return c.json({ error: 'Forbidden', message: 'Admin access required' }, 403);
+    }
+    await next();
+  };
+};
+
+export const requirePartner = (): MiddlewareHandler<AppEnv> => {
+  return async (c, next) => {
+    if (c.get('userRole') !== 'partner') {
+      return c.json({ error: 'Forbidden', message: 'Partner access required' }, 403);
     }
     await next();
   };
@@ -44,6 +60,6 @@ export function getUserId(c: { get: (key: 'userId') => string }): string {
   return c.get('userId');
 }
 
-export function getUserRole(c: { get: (key: 'userRole') => 'admin' | 'basic' }): 'admin' | 'basic' {
+export function getUserRole(c: { get: (key: 'userRole') => UserRole }): UserRole {
   return c.get('userRole');
 }

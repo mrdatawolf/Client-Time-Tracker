@@ -274,6 +274,19 @@ function createWindow(serverUrl) {
 
   mainWindow.loadURL(serverUrl);
 
+  // Intercept close to allow renderer to sync before closing
+  let allowClose = false;
+  mainWindow.on('close', (e) => {
+    if (allowClose) return;
+    e.preventDefault();
+    mainWindow.webContents.send('close-requested');
+    // Safety timeout: force close after 10 seconds
+    setTimeout(() => {
+      allowClose = true;
+      mainWindow?.close();
+    }, 10000);
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -300,6 +313,13 @@ ipcMain.on('open-settings', () => {
 ipcMain.on('close-settings', () => {
   if (settingsWindow) {
     settingsWindow.close();
+  }
+});
+
+ipcMain.on('close-ready', () => {
+  if (mainWindow) {
+    // Renderer finished syncing, allow close
+    mainWindow.destroy();
   }
 });
 

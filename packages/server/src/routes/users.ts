@@ -3,7 +3,7 @@ import { getDb } from '@ctt/shared/db';
 import { users } from '@ctt/shared/schema';
 import { eq } from 'drizzle-orm';
 import { hashPassword } from '../lib/jwt';
-import { requireAdmin } from '../middleware/auth';
+import { requireAdmin, getUserRole } from '../middleware/auth';
 import type { AppEnv } from '../types';
 
 const route = new Hono<AppEnv>();
@@ -30,11 +30,16 @@ route.get('/', async (c) => {
 // POST / - Create a new user
 route.post('/', async (c) => {
   const db = await getDb();
+  const callerRole = getUserRole(c);
   const body = await c.req.json();
   const { username, displayName, password, role } = body;
 
   if (!username || !displayName || !password) {
     return c.json({ error: 'Username, display name, and password are required' }, 400);
+  }
+
+  if (role === 'partner' && callerRole !== 'partner') {
+    return c.json({ error: 'Only partners can create partner-role users' }, 403);
   }
 
   const existing = await db.query.users.findFirst({
@@ -88,9 +93,26 @@ route.get('/:id', async (c) => {
 // PUT /:id - Update a user
 route.put('/:id', async (c) => {
   const db = await getDb();
+  const callerRole = getUserRole(c);
   const id = c.req.param('id');
   const body = await c.req.json();
   const { displayName, role, isActive, password } = body;
+
+  // Fetch target user to check their current role
+  const targetUser = await db.query.users.findFirst({ where: eq(users.id, id) });
+  if (!targetUser) {
+    return c.json({ error: 'User not found' }, 404);
+  }
+
+  // Admins cannot modify partner-role users
+  if (targetUser.role === 'partner' && callerRole !== 'partner') {
+    return c.json({ error: 'Only partners can modify partner-role users' }, 403);
+  }
+
+  // Admins cannot assign partner role
+  if (role === 'partner' && callerRole !== 'partner') {
+    return c.json({ error: 'Only partners can assign partner role' }, 403);
+  }
 
   const updateData: Record<string, unknown> = { updatedAt: new Date() };
   if (displayName !== undefined) updateData.displayName = displayName;
@@ -102,10 +124,6 @@ route.put('/:id', async (c) => {
     .set(updateData)
     .where(eq(users.id, id))
     .returning();
-
-  if (!updated) {
-    return c.json({ error: 'User not found' }, 404);
-  }
 
   return c.json({
     id: updated.id,
@@ -119,16 +137,24 @@ route.put('/:id', async (c) => {
 // DELETE /:id - Deactivate a user (soft delete)
 route.delete('/:id', async (c) => {
   const db = await getDb();
+  const callerRole = getUserRole(c);
   const id = c.req.param('id');
+
+  // Fetch target user to check their role
+  const targetUser = await db.query.users.findFirst({ where: eq(users.id, id) });
+  if (!targetUser) {
+    return c.json({ error: 'User not found' }, 404);
+  }
+
+  // Admins cannot deactivate partner-role users
+  if (targetUser.role === 'partner' && callerRole !== 'partner') {
+    return c.json({ error: 'Only partners can deactivate partner-role users' }, 403);
+  }
 
   const [updated] = await db.update(users)
     .set({ isActive: false, updatedAt: new Date() })
     .where(eq(users.id, id))
     .returning();
-
-  if (!updated) {
-    return c.json({ error: 'User not found' }, 404);
-  }
 
   return c.json({ success: true });
 });

@@ -136,7 +136,7 @@ route.post('/setup', async (c) => {
     username: username.trim(),
     displayName: displayName.trim(),
     passwordHash,
-    role: 'admin',
+    role: 'partner',
   }).returning();
 
   const token = createToken({ userId: newUser.id, role: newUser.role });

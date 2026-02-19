@@ -38,7 +38,7 @@ const TABLES_WITH_CREATED_AT_ONLY = new Set([
 function getTableColumns(tableName: string): string[] {
   const columnMap: Record<string, string[]> = {
     users: ['id', 'username', 'display_name', 'password_hash', 'role', 'is_active', 'created_at', 'updated_at'],
-    clients: ['id', 'name', 'account_holder', 'phone', 'mailing_address', 'is_active', 'notes', 'default_hourly_rate', 'created_at', 'updated_at'],
+    clients: ['id', 'name', 'account_holder', 'account_holder_id', 'phone', 'mailing_address', 'is_active', 'notes', 'default_hourly_rate', 'invoice_payable_to', 'created_at', 'updated_at'],
     job_types: ['id', 'name', 'description', 'is_active', 'created_at'],
     rate_tiers: ['id', 'amount', 'label', 'is_active', 'created_at'],
     projects: ['id', 'client_id', 'name', 'status', 'assigned_to', 'note', 'is_active', 'created_at', 'updated_at'],

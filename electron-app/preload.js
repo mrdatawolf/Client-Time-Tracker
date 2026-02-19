@@ -7,4 +7,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openSettings: () => ipcRenderer.send('open-settings'),
   closeSettings: () => ipcRenderer.send('close-settings'),
   restartApp: () => ipcRenderer.send('restart-app'),
+  onCloseRequested: (callback) => ipcRenderer.on('close-requested', () => callback()),
+  closeReady: () => ipcRenderer.send('close-ready'),
 });

@@ -244,6 +244,8 @@ function getSchemaSQL(): string {
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS default_hourly_rate NUMERIC(10, 2);
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS phone TEXT;
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS mailing_address TEXT;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS account_holder_id UUID REFERENCES users(id);
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS invoice_payable_to TEXT;
 
     -- Job Types
     CREATE TABLE IF NOT EXISTS job_types (

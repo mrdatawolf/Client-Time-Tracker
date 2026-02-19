@@ -14,9 +14,10 @@ interface ClientSelectorProps {
   value: string;
   onChange: (clientId: string) => void;
   className?: string;
+  allowAll?: boolean;
 }
 
-export default function ClientSelector({ value, onChange, className }: ClientSelectorProps) {
+export default function ClientSelector({ value, onChange, className, allowAll }: ClientSelectorProps) {
   const [clientList, setClientList] = useState<Client[]>([]);
 
   useEffect(() => {
@@ -26,17 +27,20 @@ export default function ClientSelector({ value, onChange, className }: ClientSel
   }, []);
 
   return (
-    <Select value={value} onValueChange={onChange}>
+    <Select value={value || (allowAll ? '__all__' : value)} onValueChange={(v) => onChange(v === '__all__' ? '' : v)}>
       <SelectTrigger className={className}>
         <SelectValue placeholder="Select a client..." />
       </SelectTrigger>
       <SelectContent>
+        {allowAll && (
+          <SelectItem value="__all__">All Clients</SelectItem>
+        )}
         {clientList.map((client) => (
           <SelectItem key={client.id} value={client.id}>
             {client.name}
           </SelectItem>
         ))}
-        {clientList.length === 0 && (
+        {clientList.length === 0 && !allowAll && (
           <div className="px-2 py-4 text-sm text-gray-500 text-center">
             No clients. Add one first.
           </div>

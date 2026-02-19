@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -17,9 +17,14 @@ import {
   Handshake,
   ScrollText,
   FolderKanban,
+  RefreshCw,
+  Wifi,
+  WifiOff,
+  AlertCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { clearToken, getUser } from '@/lib/api-client';
+import { supabaseSync, type SyncStatus } from '@/lib/api';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -40,6 +45,38 @@ export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const user = getUser();
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+  const [syncing, setSyncing] = useState(false);
+
+  const isAdminOrPartner = user?.role === 'admin' || user?.role === 'partner';
+
+  // Load sync status and poll
+  useEffect(() => {
+    if (!isAdminOrPartner) return;
+    let cancelled = false;
+
+    async function fetchStatus() {
+      try {
+        const s = await supabaseSync.getStatus();
+        if (!cancelled) setSyncStatus(s);
+      } catch {
+        // Not configured or not admin — ignore
+      }
+    }
+
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 15000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [isAdminOrPartner]);
+
+  async function handleSync() {
+    setSyncing(true);
+    try {
+      await supabaseSync.sync();
+      setSyncStatus(await supabaseSync.getStatus());
+    } catch { /* ignore */ }
+    finally { setSyncing(false); }
+  }
 
   const handleLogout = () => {
     clearToken();
@@ -94,7 +131,7 @@ export function Sidebar() {
           })}
         </ul>
 
-        {user?.role === 'admin' && (
+        {(user?.role === 'admin' || user?.role === 'partner') && (
           <>
             {!collapsed && (
               <div className="px-5 pt-6 pb-2">
@@ -127,6 +164,28 @@ export function Sidebar() {
         )}
       </nav>
 
+      {/* Sync status */}
+      {syncStatus?.enabled && syncStatus.state !== 'disabled' && (
+        <div className="border-t border-gray-700 px-3 py-2">
+          <div className="flex items-center gap-2">
+            <SidebarSyncIndicator state={syncing ? 'syncing' : syncStatus.state} />
+            {!collapsed && (
+              <span className="text-xs text-gray-400 truncate flex-1">
+                {syncing ? 'Syncing...' : syncStatus.state === 'idle' ? 'Synced' : syncStatus.state === 'error' ? 'Sync error' : syncStatus.state === 'offline' ? 'Offline' : 'Syncing...'}
+              </span>
+            )}
+            <button
+              onClick={handleSync}
+              disabled={syncing}
+              className="p-1 rounded hover:bg-gray-700 transition-colors"
+              title="Sync now"
+            >
+              <RefreshCw className={cn('w-3.5 h-3.5 text-gray-400', syncing && 'animate-spin')} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* User section */}
       <div className="border-t border-gray-700 p-3">
         <div className="flex items-center gap-3">
@@ -150,4 +209,19 @@ export function Sidebar() {
       </div>
     </aside>
   );
+}
+
+function SidebarSyncIndicator({ state }: { state: string }) {
+  switch (state) {
+    case 'idle':
+      return <Wifi className="w-3.5 h-3.5 text-green-400 shrink-0" />;
+    case 'syncing':
+      return <RefreshCw className="w-3.5 h-3.5 text-blue-400 animate-spin shrink-0" />;
+    case 'offline':
+      return <WifiOff className="w-3.5 h-3.5 text-orange-400 shrink-0" />;
+    case 'error':
+      return <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />;
+    default:
+      return null;
+  }
 }

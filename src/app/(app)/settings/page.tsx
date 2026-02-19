@@ -21,6 +21,7 @@ import {
   type RateTier,
 } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
+import { isPartner as checkIsPartner } from '@/lib/api-client';
 import SupabaseTab from './supabase-tab';
 
 type Tab = 'general' | 'users' | 'jobTypes' | 'rateTiers' | 'supabase';
@@ -77,6 +78,8 @@ export default function SettingsPage() {
 
 function GeneralTab() {
   const [baseRate, setBaseRate] = useState('185');
+  const [companyName, setCompanyName] = useState('');
+  const [payableTo, setPayableTo] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -85,9 +88,9 @@ function GeneralTab() {
     setLoading(true);
     try {
       const data = await settingsApi.get();
-      if (data.baseHourlyRate) {
-        setBaseRate(data.baseHourlyRate);
-      }
+      if (data.baseHourlyRate) setBaseRate(data.baseHourlyRate);
+      if (data.companyName) setCompanyName(data.companyName);
+      if (data.invoicePayableTo) setPayableTo(data.invoicePayableTo);
     } catch (err) {
       console.error('Failed to load settings:', err);
     } finally {
@@ -101,7 +104,11 @@ function GeneralTab() {
     setSaving(true);
     setSaved(false);
     try {
-      await settingsApi.update({ baseHourlyRate: baseRate });
+      await settingsApi.update({
+        baseHourlyRate: baseRate,
+        companyName,
+        invoicePayableTo: payableTo,
+      });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
@@ -116,29 +123,62 @@ function GeneralTab() {
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 max-w-lg">
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">Rates</h2>
-      <div className="space-y-4">
-        <div className="space-y-1">
-          <label className="text-sm font-medium">Base Hourly Rate ($)</label>
-          <Input
-            type="number"
-            step="0.01"
-            min="0"
-            value={baseRate}
-            onChange={(e) => setBaseRate(e.target.value)}
-            placeholder="185.00"
-          />
-          <p className="text-xs text-gray-500">
-            Default rate used when a client does not have a specific hourly rate set.
-          </p>
+    <div className="space-y-6 max-w-lg">
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Company</h2>
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Company Name</label>
+            <Input
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              placeholder="Lost Coast IT"
+            />
+            <p className="text-xs text-gray-500">
+              Shown at the top of generated invoices.
+            </p>
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Invoice &quot;Payable To&quot;</label>
+            <textarea
+              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              rows={3}
+              value={payableTo}
+              onChange={(e) => setPayableTo(e.target.value)}
+              placeholder={"Name\nAddress line 1\nCity, State ZIP"}
+            />
+            <p className="text-xs text-gray-500">
+              Displayed in the &quot;Payable To&quot; footer of invoices. Use separate lines for name and address.
+            </p>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Button onClick={handleSave} disabled={saving || !baseRate}>
-            {saving ? 'Saving...' : 'Save'}
-          </Button>
-          {saved && <span className="text-sm text-green-600">Saved</span>}
+      </div>
+
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Rates</h2>
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Base Hourly Rate ($)</label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              value={baseRate}
+              onChange={(e) => setBaseRate(e.target.value)}
+              placeholder="185.00"
+            />
+            <p className="text-xs text-gray-500">
+              Default rate used when a client does not have a specific hourly rate set.
+            </p>
+          </div>
         </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <Button onClick={handleSave} disabled={saving}>
+          {saving ? 'Saving...' : 'Save'}
+        </Button>
+        {saved && <span className="text-sm text-green-600">Saved</span>}
       </div>
     </div>
   );
@@ -157,7 +197,8 @@ function UsersTab() {
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'admin' | 'basic'>('basic');
+  const [role, setRole] = useState<'partner' | 'admin' | 'basic'>('basic');
+  const currentUserIsPartner = checkIsPartner();
   const [saving, setSaving] = useState(false);
 
   // Reset password state
@@ -273,6 +314,7 @@ function UsersTab() {
                   <td className="px-6 py-3 text-gray-600">{user.displayName}</td>
                   <td className="px-6 py-3">
                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                      user.role === 'partner' ? 'bg-amber-100 text-amber-700' :
                       user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'
                     }`}>
                       {user.role}
@@ -286,22 +328,26 @@ function UsersTab() {
                     </span>
                   </td>
                   <td className="px-6 py-3 text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => openEdit(user)} title="Edit">
-                        <Pencil className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => { setResetPwUser(user); setNewPassword(''); }} title="Reset Password">
-                        <Key className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleToggleActive(user)}
-                        title={user.isActive ? 'Deactivate' : 'Activate'}
-                      >
-                        <Trash2 className={`w-3.5 h-3.5 ${user.isActive ? 'text-red-500' : 'text-green-500'}`} />
-                      </Button>
-                    </div>
+                    {user.role === 'partner' && !currentUserIsPartner ? (
+                      <span className="text-xs text-gray-400">—</span>
+                    ) : (
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => openEdit(user)} title="Edit">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => { setResetPwUser(user); setNewPassword(''); }} title="Reset Password">
+                          <Key className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleToggleActive(user)}
+                          title={user.isActive ? 'Deactivate' : 'Activate'}
+                        >
+                          <Trash2 className={`w-3.5 h-3.5 ${user.isActive ? 'text-red-500' : 'text-green-500'}`} />
+                        </Button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -337,11 +383,12 @@ function UsersTab() {
               <label className="text-sm font-medium">Role</label>
               <select
                 value={role}
-                onChange={(e) => setRole(e.target.value as 'admin' | 'basic')}
+                onChange={(e) => setRole(e.target.value as 'partner' | 'admin' | 'basic')}
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm bg-white h-10"
               >
                 <option value="basic">Basic</option>
                 <option value="admin">Admin</option>
+                {currentUserIsPartner && <option value="partner">Partner</option>}
               </select>
             </div>
           </div>

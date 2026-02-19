@@ -2,8 +2,7 @@ import { Hono } from 'hono';
 import { eq, and, sql, desc } from 'drizzle-orm';
 import { getDb } from '@ctt/shared/db';
 import { timeEntries, rateTiers, clients, users, jobTypes } from '@ctt/shared/schema';
-import { requireAdmin } from '../middleware/auth';
-import { getUserId, getUserRole } from '../middleware/auth';
+import { requireAdmin, getUserId, getUserRole, isAtLeastAdmin } from '../middleware/auth';
 import type { AppEnv } from '../types';
 
 const app = new Hono<AppEnv>();
@@ -104,7 +103,7 @@ app.get('/date-range', async (c) => {
 
   // Basic users can only see their own entries
   const role = getUserRole(c);
-  if (role !== 'admin') {
+  if (!isAtLeastAdmin(role)) {
     conditions.push(eq(timeEntries.techId, getUserId(c)));
   }
 
@@ -146,7 +145,7 @@ app.get('/export', async (c) => {
   if (clientId) conditions.push(eq(timeEntries.clientId, clientId));
 
   const role = getUserRole(c);
-  if (role !== 'admin') {
+  if (!isAtLeastAdmin(role)) {
     conditions.push(eq(timeEntries.techId, getUserId(c)));
   }
 

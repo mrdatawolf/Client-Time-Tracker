@@ -1,7 +1,7 @@
 import { pgTable, uuid, text, timestamp, boolean, numeric, date, pgEnum } from 'drizzle-orm/pg-core';
 
 // Enums
-export const userRoleEnum = pgEnum('user_role', ['admin', 'basic']);
+export const userRoleEnum = pgEnum('user_role', ['partner', 'admin', 'basic']);
 
 // ============================================================================
 // CORE TABLES
@@ -22,11 +22,13 @@ export const clients = pgTable('clients', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: text('name').notNull().unique(),
   accountHolder: text('account_holder'),
+  accountHolderId: uuid('account_holder_id').references(() => users.id),
   phone: text('phone'),
   mailingAddress: text('mailing_address'),
   isActive: boolean('is_active').notNull().default(true),
   notes: text('notes'),
   defaultHourlyRate: numeric('default_hourly_rate', { precision: 10, scale: 2 }),
+  invoicePayableTo: text('invoice_payable_to'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

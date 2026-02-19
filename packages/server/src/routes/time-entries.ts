@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { getDb } from '@ctt/shared/db';
 import { timeEntries, rateTiers } from '@ctt/shared/schema';
 import { eq, and, gte, lte, sql } from 'drizzle-orm';
-import { getUserId, getUserRole } from '../middleware/auth';
+import { getUserId, getUserRole, isAtLeastAdmin } from '../middleware/auth';
 import type { AppEnv } from '../types';
 
 const route = new Hono<AppEnv>();
@@ -65,15 +65,18 @@ route.get('/grid', async (c) => {
   const dateFrom = c.req.query('dateFrom');
   const dateTo = c.req.query('dateTo');
 
-  if (!clientId || !dateFrom || !dateTo) {
-    return c.json({ error: 'clientId, dateFrom, and dateTo are required' }, 400);
+  if (!dateFrom || !dateTo) {
+    return c.json({ error: 'dateFrom and dateTo are required' }, 400);
   }
 
   const conditions = [
-    eq(timeEntries.clientId, clientId),
     gte(timeEntries.date, dateFrom),
     lte(timeEntries.date, dateTo),
   ];
+
+  if (clientId) {
+    conditions.push(eq(timeEntries.clientId, clientId));
+  }
 
   if (role === 'basic') {
     conditions.push(eq(timeEntries.techId, userId));
@@ -82,6 +85,7 @@ route.get('/grid', async (c) => {
   const entries = await db.query.timeEntries.findMany({
     where: and(...conditions),
     with: {
+      client: { columns: { id: true, name: true } },
       tech: { columns: { id: true, displayName: true } },
       jobType: true,
       rateTier: true,
@@ -113,7 +117,7 @@ route.post('/', async (c) => {
   }
 
   // Basic users can only create entries for themselves
-  const entryTechId = role === 'admin' && techId ? techId : userId;
+  const entryTechId = isAtLeastAdmin(role) && techId ? techId : userId;
 
   const [entry] = await db.insert(timeEntries).values({
     clientId,
@@ -143,7 +147,7 @@ route.post('/bulk', async (c) => {
 
   const values = entries.map((e: Record<string, unknown>) => ({
     clientId: e.clientId as string,
-    techId: (role === 'admin' && e.techId ? e.techId : userId) as string,
+    techId: (isAtLeastAdmin(role) && e.techId ? e.techId : userId) as string,
     jobTypeId: e.jobTypeId as string,
     rateTierId: e.rateTierId as string,
     date: e.date as string,
@@ -161,7 +165,7 @@ route.put('/bulk', async (c) => {
   const db = await getDb();
   const role = getUserRole(c);
 
-  if (role !== 'admin') {
+  if (!isAtLeastAdmin(role)) {
     return c.json({ error: 'Forbidden' }, 403);
   }
 
@@ -253,8 +257,8 @@ route.put('/:id', async (c) => {
   if (notes !== undefined) updateData.notes = notes;
   if (groupId !== undefined) updateData.groupId = groupId;
 
-  // Only admins can change billing status
-  if (role === 'admin') {
+  // Only admins+ can change billing status
+  if (isAtLeastAdmin(role)) {
     if (isBilled !== undefined) updateData.isBilled = isBilled;
     if (isPaid !== undefined) updateData.isPaid = isPaid;
   }

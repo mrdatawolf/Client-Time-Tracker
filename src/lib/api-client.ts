@@ -74,7 +74,12 @@ export function isAuthenticated(): boolean {
 
 export function isAdmin(): boolean {
   const user = getUser();
-  return user?.role === 'admin';
+  return user?.role === 'admin' || user?.role === 'partner';
+}
+
+export function isPartner(): boolean {
+  const user = getUser();
+  return user?.role === 'partner';
 }
 
 export { ApiError };
