@@ -5,15 +5,17 @@ A full-stack time tracking and invoicing application built for IT service provid
 ## Features
 
 - **Dashboard** — At-a-glance view of today's hours, weekly hours, unbilled totals, and active clients
-- **Time Entry** — Log hours by client, job type, and technician with per-entry rates
-- **Client Management** — Track client details, contact info, mailing addresses, and default hourly rates
-- **Invoice Generation** — Create invoices from time entries, edit line items inline, and export to PDF
+- **Time Entry** — Log hours by client, job type, and technician with flexible rate input and rate tier suggestions
+- **Client Management** — Track client details, contact info, mailing addresses, default hourly rates, and per-client invoice settings
+- **Invoice Generation** — Create sequential invoices from time entries with tech name and date in descriptions, edit line items inline, and export to PDF
 - **Project Tracker** — Lightweight kanban-style project tracking grouped by client with status labels (in progress, waiting on client, needs call, etc.)
 - **Reports** — Filter and analyze time entries across date ranges, clients, and technicians
-- **Partner View** — Dedicated view for business partners
+- **Partner Revenue Split** — Per-entry revenue split based on account holder vs technician with configurable percentages
+- **Supabase Cloud Sync** — Optional bidirectional sync to Supabase PostgreSQL for team collaboration, with encrypted config export/import for easy setup
 - **Audit Log** — Track changes across the system
-- **Multi-user Auth** — JWT-based authentication with admin and standard user roles
+- **Multi-user Auth** — JWT-based authentication with admin, partner, and standard user roles
 - **First-Time Setup** — Self-service account creation when no users exist yet
+- **Company Settings** — Configurable company name and "payable to" address for invoices
 
 ## Tech Stack
 

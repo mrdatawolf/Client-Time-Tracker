@@ -119,18 +119,26 @@ route.post('/', async (c) => {
   // Basic users can only create entries for themselves
   const entryTechId = isAtLeastAdmin(role) && techId ? techId : userId;
 
-  const [entry] = await db.insert(timeEntries).values({
-    clientId,
-    techId: entryTechId,
-    jobTypeId,
-    rateTierId,
-    date,
-    hours: String(hours),
-    notes: notes || null,
-    groupId: groupId || null,
-  }).returning();
+  try {
+    const [entry] = await db.insert(timeEntries).values({
+      clientId,
+      techId: entryTechId,
+      jobTypeId,
+      rateTierId,
+      date,
+      hours: String(hours),
+      notes: notes || null,
+      groupId: groupId || null,
+    }).returning();
 
-  return c.json(entry, 201);
+    return c.json(entry, 201);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Failed to create time entry';
+    if (msg.includes('foreign key') || msg.includes('violates') || msg.includes('FOREIGN KEY')) {
+      return c.json({ error: 'Invalid reference: one of the selected items (client, job type, or rate tier) does not exist.' }, 400);
+    }
+    return c.json({ error: msg }, 500);
+  }
 });
 
 // POST /bulk - Batch create time entries

@@ -664,4 +664,15 @@ export const supabaseSync = {
       method: 'POST',
       body: JSON.stringify({ direction }),
     }),
+
+  exportConfig: () =>
+    apiClient<{ exportString: string }>('/api/supabase/config/export', {
+      method: 'POST',
+    }),
+
+  importConfig: (exportString: string) =>
+    apiClient<{ supabaseUrl: string; databaseUrl: string; supabaseAnonKey: string; supabaseServiceKey: string }>('/api/supabase/config/import', {
+      method: 'POST',
+      body: JSON.stringify({ exportString }),
+    }),
 };

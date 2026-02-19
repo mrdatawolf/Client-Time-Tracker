@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import dns from 'dns/promises';
+import crypto from 'crypto';
 import { requireAdmin } from '../middleware/auth';
 import type { AppEnv } from '../types';
 import {
@@ -80,6 +81,63 @@ app.put('/config', requireAdmin(), async (c) => {
 
   const saved = saveSupabaseConfig(body);
   return c.json({ success: true, instanceId: saved.instanceId });
+});
+
+// Built-in encryption key (obfuscation, not high-security)
+const CONFIG_CIPHER_KEY = crypto.createHash('sha256').update('ctt-supabase-config-export-2024').digest();
+const CONFIG_IV_LENGTH = 16;
+
+// Export config as encrypted string
+app.post('/config/export', requireAdmin(), async (c) => {
+  const config = loadSupabaseConfig();
+  if (!config?.databaseUrl) {
+    return c.json({ error: 'No Supabase config to export' }, 400);
+  }
+
+  const payload = JSON.stringify({
+    supabaseUrl: config.supabaseUrl,
+    databaseUrl: config.databaseUrl,
+    supabaseAnonKey: config.supabaseAnonKey,
+    supabaseServiceKey: config.supabaseServiceKey,
+  });
+
+  const iv = crypto.randomBytes(CONFIG_IV_LENGTH);
+  const cipher = crypto.createCipheriv('aes-256-cbc', CONFIG_CIPHER_KEY, iv);
+  const encrypted = Buffer.concat([cipher.update(payload, 'utf8'), cipher.final()]);
+  const exportString = 'CTT:' + Buffer.concat([iv, encrypted]).toString('base64');
+
+  return c.json({ exportString });
+});
+
+// Import config from encrypted string
+app.post('/config/import', requireAdmin(), async (c) => {
+  const { exportString } = await c.req.json() as { exportString: string };
+
+  if (!exportString || !exportString.startsWith('CTT:')) {
+    return c.json({ error: 'Invalid config string. Must start with CTT:' }, 400);
+  }
+
+  try {
+    const data = Buffer.from(exportString.slice(4), 'base64');
+    const iv = data.subarray(0, CONFIG_IV_LENGTH);
+    const encrypted = data.subarray(CONFIG_IV_LENGTH);
+    const decipher = crypto.createDecipheriv('aes-256-cbc', CONFIG_CIPHER_KEY, iv);
+    const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
+    const parsed = JSON.parse(decrypted);
+
+    if (!parsed.databaseUrl) {
+      return c.json({ error: 'Invalid config: missing database URL' }, 400);
+    }
+
+    return c.json({
+      supabaseUrl: parsed.supabaseUrl || '',
+      databaseUrl: parsed.databaseUrl,
+      supabaseAnonKey: parsed.supabaseAnonKey || '',
+      supabaseServiceKey: parsed.supabaseServiceKey || '',
+    });
+  } catch {
+    return c.json({ error: 'Failed to decrypt config string. It may be corrupted or invalid.' }, 400);
+  }
 });
 
 // Test the PostgreSQL connection to Supabase

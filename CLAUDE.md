@@ -111,10 +111,44 @@ Lightweight project tracker for seeing where client work is stalled at a glance.
 ### Invoices & PDF Generation
 
 - **PDF generation**: `GET /api/invoices/:id/pdf` using `pdfkit` — generates a PDF matching the company invoice template (see `Examples/Invoice - Client 0001.docx`)
-- **Company settings** (stored in `app_settings`): `companyName` (default: "Lost Coast IT"), `invoicePayableTo` (default: "Patrick, Moon\n6336 Purdue Dr. Eureka, Ca 95503")
+- **Company settings** (stored in `app_settings`): `companyName` (default: "Lost Coast IT"), `invoicePayableTo` (default: "Patrick, Moon\n6336 Purdue Dr. Eureka, Ca 95503"). Both configurable in Settings → General.
+- **Per-client payable-to override**: Clients can have their own `invoicePayableTo` that overrides the global default on their invoices.
+- **Invoice numbers**: Sequential per client (e.g., `ACM-0001`, `ACM-0002`), using the first 3 letters of the client name as prefix.
+- **Line item descriptions**: Generated as `note (TechName) (M/D)` format — e.g., `"moved the computer (Patrick) (2/18)"`.
 - **Inline editing**: Invoice detail page supports editing line items (description, hours, rate), adding/deleting lines, and editing invoice fields (number, dates, notes) for draft/sent invoices
 - **Line item endpoints**: `PUT /:invoiceId/line-items/:lineId`, `POST /:invoiceId/line-items`, `DELETE /:invoiceId/line-items/:lineId`
 
 ### Client Fields
 
-Clients have: `name`, `accountHolder`, `phone`, `mailingAddress`, `notes`, `defaultHourlyRate`. Phone and mailing address are used on PDF invoices.
+Clients have: `name`, `accountHolder`, `accountHolderId`, `phone`, `mailingAddress`, `notes`, `defaultHourlyRate`, `invoicePayableTo`. Phone and mailing address are used on PDF invoices. `accountHolderId` is a UUID reference to `users.id` for partner revenue split calculations.
+
+### Partner Revenue Split
+
+Per-entry split logic based on the client's account holder vs the technician:
+1. No account holder on client → 100% to technician
+2. Account holder == technician → 100% to technician
+3. Account holder ≠ technician → configurable split (default 73% tech / 27% account holder)
+
+Split percentages stored in `app_settings` (`splitTechPercent`, `splitHolderPercent`). Configurable in the Partner page.
+
+### Supabase Sync
+
+Optional cloud sync to a Supabase PostgreSQL database for team collaboration.
+
+- **Config**: Stored in `data/supabase-config.json` (URL, database URL, API keys)
+- **Config export/import**: `POST /api/supabase/config/export` and `/config/import` — AES-256-CBC encrypted config strings (`CTT:...`) for easy sharing between installations
+- **Sync engine**: Bidirectional push/pull with changelog tracking and timestamp-based conflict resolution (`packages/shared/src/db/sync-engine.ts`)
+- **Scheduler**: Background sync every 30s when enabled (`packages/shared/src/db/sync-scheduler.ts`)
+- **Sidebar indicator**: Shows sync state (connected/syncing/offline/error) with manual sync button for admin/partner users
+- **Routes**: `packages/server/src/routes/supabase.ts` — config, test-connection, setup-schema, sync, initial-sync
+
+### Error Handling
+
+- **Global error handler**: `app.onError()` in `packages/server/src/index.ts` catches unhandled exceptions and returns structured `{ error: message }` JSON
+- **Time entry creation**: Try-catch with descriptive messages for FK violations ("Invalid reference: one of the selected items...") instead of generic 500s
+
+### Rate Tiers & Time Entry Rates
+
+- Time entry dialog uses a free-form rate input with clickable rate tier suggestion chips
+- Auto-defaults rate from: client's `defaultHourlyRate` → global `baseHourlyRate` setting → first active rate tier
+- Custom rates auto-create new rate tiers on save via `resolveRateTierId()`
