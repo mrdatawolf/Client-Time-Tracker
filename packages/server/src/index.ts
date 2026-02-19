@@ -76,6 +76,12 @@ app.route('/api/projects', projectRoutes);
 app.route('/api/client-chat-logs', clientChatLogRoutes);
 app.route('/api/supabase', supabaseRoutes);
 
+// Global error handler — catch unhandled exceptions and return structured JSON
+app.onError((err, c) => {
+  console.error(`[${c.req.method}] ${c.req.path} — Error:`, err.message);
+  return c.json({ error: err.message || 'Internal Server Error' }, 500);
+});
+
 // Start the server
 const port = parseInt(process.env.API_PORT || '3701', 10);
 const hostname = process.env.API_HOST || '0.0.0.0';

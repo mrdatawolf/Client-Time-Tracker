@@ -33,6 +33,14 @@ export default function SupabaseTab() {
   const [schemaResult, setSchemaResult] = useState<{ success: boolean; message: string } | null>(null);
   const [syncing, setSyncing] = useState(false);
 
+  // Export/Import
+  const [exporting, setExporting] = useState(false);
+  const [exportCopied, setExportCopied] = useState(false);
+  const [importString, setImportString] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState('');
+  const [importSuccess, setImportSuccess] = useState(false);
+
   // Initial sync dialog
   const [initialSyncOpen, setInitialSyncOpen] = useState(false);
   const [initialSyncDirection, setInitialSyncDirection] = useState<'push' | 'pull' | 'merge'>('push');
@@ -153,6 +161,42 @@ export default function SupabaseTab() {
     }
   }
 
+  async function handleExport() {
+    setExporting(true);
+    setExportCopied(false);
+    try {
+      const { exportString } = await supabaseSync.exportConfig();
+      await navigator.clipboard.writeText(exportString);
+      setExportCopied(true);
+      setTimeout(() => setExportCopied(false), 3000);
+    } catch (err) {
+      console.error('Export failed:', err);
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function handleImport() {
+    if (!importString.trim()) return;
+    setImporting(true);
+    setImportError('');
+    setImportSuccess(false);
+    try {
+      const result = await supabaseSync.importConfig(importString.trim());
+      setSupabaseUrl(result.supabaseUrl || '');
+      setDatabaseUrl(result.databaseUrl || '');
+      setAnonKey(result.supabaseAnonKey || '');
+      setServiceKey(result.supabaseServiceKey || '');
+      setImportString('');
+      setImportSuccess(true);
+      setTimeout(() => setImportSuccess(false), 3000);
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : 'Import failed');
+    } finally {
+      setImporting(false);
+    }
+  }
+
   if (loading) {
     return <div className="p-8 text-center text-gray-500">Loading...</div>;
   }
@@ -225,6 +269,44 @@ export default function SupabaseTab() {
               {saving ? 'Saving...' : 'Save Connection'}
             </Button>
             {saved && <span className="text-sm text-green-600">Saved</span>}
+          </div>
+
+          {/* Export / Import */}
+          <div className="pt-4 border-t border-gray-100 space-y-3">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExport}
+                disabled={exporting || !config?.databaseUrl}
+              >
+                {exporting ? 'Exporting...' : exportCopied ? 'Copied!' : 'Export Config'}
+              </Button>
+              <span className="text-xs text-gray-500">
+                Copy an encrypted config string to share with another installation
+              </span>
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Import Config</label>
+              <div className="flex gap-2">
+                <Input
+                  value={importString}
+                  onChange={(e) => { setImportString(e.target.value); setImportError(''); }}
+                  placeholder="Paste CTT:... string here"
+                  className="flex-1"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleImport}
+                  disabled={importing || !importString.trim()}
+                >
+                  {importing ? 'Importing...' : 'Import'}
+                </Button>
+              </div>
+              {importError && <p className="text-xs text-red-600">{importError}</p>}
+              {importSuccess && <p className="text-xs text-green-600">Imported! Review the fields above, then click Save Connection.</p>}
+            </div>
           </div>
         </div>
       </div>
