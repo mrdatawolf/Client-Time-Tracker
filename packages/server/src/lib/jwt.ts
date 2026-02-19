@@ -7,7 +7,7 @@ const JWT_EXPIRES_IN = parseInt(process.env.JWT_EXPIRES_IN || '86400', 10);
 
 interface TokenPayload {
   userId: string;
-  role: 'admin' | 'basic';
+  role: 'partner' | 'admin' | 'basic';
 }
 
 export function createToken(payload: TokenPayload): string {

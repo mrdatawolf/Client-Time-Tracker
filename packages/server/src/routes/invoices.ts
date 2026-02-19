@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { getDb } from '@ctt/shared/db';
-import { invoices, invoiceLineItems, timeEntries, rateTiers, clients, appSettings } from '@ctt/shared/schema';
+import { invoices, invoiceLineItems, timeEntries, rateTiers, clients, appSettings, users } from '@ctt/shared/schema';
 import { requireAdmin } from '../middleware/auth';
 import type { AppEnv } from '../types';
 import PDFDocument from 'pdfkit';
@@ -69,7 +69,7 @@ app.get('/:id/pdf', async (c) => {
   }
 
   const companyName = settings.companyName || 'Lost Coast IT';
-  const payableTo = settings.invoicePayableTo || 'Patrick, Moon\n6336 Purdue Dr. Eureka, Ca 95503';
+  const payableTo = client.invoicePayableTo || settings.invoicePayableTo || 'Patrick, Moon\n6336 Purdue Dr. Eureka, Ca 95503';
 
   // Format date
   function formatInvoiceDate(dateStr: string): string {
@@ -244,19 +244,33 @@ app.post('/generate', requireAdmin(), async (c) => {
   const unbilled = await db.select({
     entry: timeEntries,
     rate: rateTiers,
+    tech: users,
   })
     .from(timeEntries)
     .innerJoin(rateTiers, eq(timeEntries.rateTierId, rateTiers.id))
+    .innerJoin(users, eq(timeEntries.techId, users.id))
     .where(and(...conditions));
 
   if (unbilled.length === 0) {
     return c.json({ error: 'No unbilled entries found' }, 400);
   }
 
-  // Generate invoice number
+  // Generate sequential invoice number per client (e.g., ACM-0001, ACM-0002)
   const [client] = await db.select().from(clients).where(eq(clients.id, clientId));
   const prefix = (client?.name || 'INV').substring(0, 3).toUpperCase();
-  const invoiceNumber = `${prefix}-${Date.now().toString(36).toUpperCase()}`;
+  const existing = await db.select({ invoiceNumber: invoices.invoiceNumber })
+    .from(invoices)
+    .where(eq(invoices.clientId, clientId))
+    .orderBy(desc(invoices.createdAt));
+  let nextNum = 1;
+  for (const row of existing) {
+    const match = row.invoiceNumber.match(/-(\d+)$/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num >= nextNum) nextNum = num + 1;
+    }
+  }
+  const invoiceNumber = `${prefix}-${String(nextNum).padStart(4, '0')}`;
 
   // Create the invoice
   const [invoice] = await db.insert(invoices).values({
@@ -269,11 +283,20 @@ app.post('/generate', requireAdmin(), async (c) => {
   }).returning();
 
   // Create line items from entries
-  for (const { entry, rate } of unbilled) {
+  for (const { entry, rate, tech } of unbilled) {
+    // Format date as M/D (e.g., "2/18")
+    const d = new Date(entry.date + 'T00:00:00');
+    const shortDate = `${d.getMonth() + 1}/${d.getDate()}`;
+    const techName = tech.displayName || tech.username;
+    const note = entry.notes || '';
+    const description = note
+      ? `${note} (${techName}) (${shortDate})`
+      : `(${techName}) (${shortDate})`;
+
     await db.insert(invoiceLineItems).values({
       invoiceId: invoice.id,
       timeEntryId: entry.id,
-      description: `${entry.date} - ${entry.hours}h`,
+      description,
       hours: entry.hours,
       rate: rate.amount,
     });

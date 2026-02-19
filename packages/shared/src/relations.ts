@@ -27,6 +27,7 @@ export const clientsRelations = relations(clients, ({ many, one }) => ({
   invoices: many(invoices),
   projects: many(projects),
   chatLog: one(clientChatLogs, { fields: [clients.id], references: [clientChatLogs.clientId] }),
+  accountHolderUser: one(users, { fields: [clients.accountHolderId], references: [users.id] }),
 }));
 
 export const timeEntriesRelations = relations(timeEntries, ({ one }) => ({

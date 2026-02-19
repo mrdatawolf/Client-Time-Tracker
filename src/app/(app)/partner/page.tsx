@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Handshake, DollarSign, Percent, Trash2 } from 'lucide-react';
+import { Handshake, DollarSign, Percent } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,7 +22,7 @@ import {
 import {
   partner as partnerApi,
   users as usersApi,
-  type PartnerSplit,
+  type SplitConfig,
   type PartnerSettlement,
   type PartnerSummaryResponse,
   type User,
@@ -30,7 +30,7 @@ import {
 import { formatCurrency, formatDate, toISODate } from '@/lib/utils';
 
 export default function PartnerPage() {
-  const [splits, setSplits] = useState<PartnerSplit[]>([]);
+  const [splitConfig, setSplitConfig] = useState<SplitConfig | null>(null);
   const [settlements, setSettlements] = useState<PartnerSettlement[]>([]);
   const [summary, setSummary] = useState<PartnerSummaryResponse | null>(null);
   const [adminUsers, setAdminUsers] = useState<User[]>([]);
@@ -42,8 +42,8 @@ export default function PartnerPage() {
 
   // Split dialog
   const [splitDialogOpen, setSplitDialogOpen] = useState(false);
-  const [newSplits, setNewSplits] = useState<{ partnerId: string; splitPercent: string }[]>([]);
-  const [splitEffective, setSplitEffective] = useState('');
+  const [newTechPercent, setNewTechPercent] = useState('');
+  const [newHolderPercent, setNewHolderPercent] = useState('');
   const [splitError, setSplitError] = useState('');
   const [savingSplit, setSavingSplit] = useState(false);
 
@@ -73,9 +73,9 @@ export default function PartnerPage() {
         partnerApi.getSettlements(),
         usersApi.list(),
       ]);
-      setSplits(sp);
+      setSplitConfig(sp);
       setSettlements(sett);
-      setAdminUsers(admins.filter(u => u.role === 'admin'));
+      setAdminUsers(admins.filter(u => u.role === 'partner'));
     } catch (err) {
       console.error('Failed to load partner data:', err);
     } finally {
@@ -98,48 +98,24 @@ export default function PartnerPage() {
 
   // --- Split management ---
   function openSplitDialog() {
-    // Pre-fill with current splits or empty rows for each admin
-    if (splits.length > 0) {
-      setNewSplits(splits.map(s => ({
-        partnerId: s.partnerId,
-        splitPercent: (Number(s.splitPercent) * 100).toFixed(2),
-      })));
-    } else {
-      setNewSplits(adminUsers.map(u => ({
-        partnerId: u.id,
-        splitPercent: '',
-      })));
-    }
-    setSplitEffective(toISODate(new Date()));
+    setNewTechPercent(String(splitConfig?.techPercent ?? 73));
+    setNewHolderPercent(String(splitConfig?.holderPercent ?? 27));
     setSplitError('');
     setSplitDialogOpen(true);
   }
 
-  function updateSplitPercent(idx: number, value: string) {
-    setNewSplits(prev => prev.map((s, i) => i === idx ? { ...s, splitPercent: value } : s));
-  }
-
   async function handleSaveSplits() {
-    const total = newSplits.reduce((s, sp) => s + (parseFloat(sp.splitPercent) || 0), 0);
-    if (Math.abs(total - 100) > 0.01) {
-      setSplitError(`Split percentages must total 100% (currently ${total.toFixed(2)}%)`);
-      return;
-    }
-    if (!splitEffective) {
-      setSplitError('Effective date is required');
+    const tech = parseFloat(newTechPercent) || 0;
+    const holder = parseFloat(newHolderPercent) || 0;
+    if (Math.abs(tech + holder - 100) > 0.01) {
+      setSplitError(`Percentages must total 100% (currently ${(tech + holder).toFixed(2)}%)`);
       return;
     }
 
     setSavingSplit(true);
     setSplitError('');
     try {
-      await partnerApi.setSplits({
-        splits: newSplits.map(s => ({
-          partnerId: s.partnerId,
-          splitPercent: parseFloat(s.splitPercent) / 100,
-        })),
-        effectiveFrom: splitEffective,
-      });
+      await partnerApi.setSplits({ techPercent: tech, holderPercent: holder });
       setSplitDialogOpen(false);
       loadData();
       loadSummary();
@@ -275,10 +251,7 @@ export default function PartnerPage() {
               </div>
             ) : (
               <div className="text-center text-gray-500 text-sm py-4">
-                No partner splits configured.{' '}
-                <button onClick={openSplitDialog} className="text-blue-600 hover:underline">
-                  Set up splits
-                </button>
+                No partner data for this period.
               </div>
             )}
           </>
@@ -294,31 +267,34 @@ export default function PartnerPage() {
           <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
               <Percent className="w-4 h-4" />
-              Current Splits
+              Split Configuration
             </h2>
             <Button size="sm" variant="outline" onClick={openSplitDialog}>
               Update Splits
             </Button>
           </div>
-          {splits.length === 0 ? (
-            <div className="p-6 text-center text-gray-500">
-              No splits configured
+          <div className="p-6">
+            <div className="text-sm text-gray-500 mb-3">
+              When the account holder differs from the technician:
             </div>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {splits.map((s) => (
-                <div key={s.id} className="px-6 py-3 flex items-center justify-between">
-                  <span className="font-medium text-gray-900">{s.partnerName}</span>
-                  <div className="text-right">
-                    <span className="text-lg font-semibold text-gray-900">
-                      {(Number(s.splitPercent) * 100).toFixed(1)}%
-                    </span>
-                    <div className="text-xs text-gray-400">Since {formatDate(s.effectiveFrom)}</div>
-                  </div>
-                </div>
-              ))}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-gray-900">Technician</span>
+                <span className="text-lg font-semibold text-gray-900">
+                  {splitConfig?.techPercent ?? 73}%
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-gray-900">Account Holder</span>
+                <span className="text-lg font-semibold text-gray-900">
+                  {splitConfig?.holderPercent ?? 27}%
+                </span>
+              </div>
             </div>
-          )}
+            <div className="mt-4 text-xs text-gray-400">
+              If no account holder is set, or the tech is the account holder, 100% goes to the technician.
+            </div>
+          </div>
         </div>
 
         {/* Quick actions */}
@@ -374,7 +350,7 @@ export default function PartnerPage() {
       <Dialog open={splitDialogOpen} onOpenChange={setSplitDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Update Revenue Splits</DialogTitle>
+            <DialogTitle>Update Revenue Split</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             {splitError && (
@@ -382,48 +358,48 @@ export default function PartnerPage() {
                 {splitError}
               </div>
             )}
-            <div className="space-y-2">
-              <Label>Effective From *</Label>
-              <Input
-                type="date"
-                value={splitEffective}
-                onChange={(e) => setSplitEffective(e.target.value)}
-              />
-            </div>
+            <p className="text-sm text-gray-500">
+              Set the split percentages for when the account holder differs from the technician.
+            </p>
             <div className="space-y-3">
-              {newSplits.map((s, i) => {
-                const partner = adminUsers.find(u => u.id === s.partnerId);
-                return (
-                  <div key={s.partnerId} className="flex items-center gap-3">
-                    <span className="w-32 text-sm font-medium text-gray-700 truncate">
-                      {partner?.displayName || 'Unknown'}
-                    </span>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="100"
-                      value={s.splitPercent}
-                      onChange={(e) => updateSplitPercent(i, e.target.value)}
-                      placeholder="0.00"
-                      className="w-28"
-                    />
-                    <span className="text-sm text-gray-500">%</span>
-                  </div>
-                );
-              })}
-            </div>
-            {newSplits.length > 0 && (
-              <div className="text-sm text-gray-500 bg-gray-50 rounded p-3">
-                Total: <span className={`font-semibold ${
-                  Math.abs(newSplits.reduce((s, sp) => s + (parseFloat(sp.splitPercent) || 0), 0) - 100) < 0.01
-                    ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {newSplits.reduce((s, sp) => s + (parseFloat(sp.splitPercent) || 0), 0).toFixed(2)}%
-                </span>
-                {' '}(must equal 100%)
+              <div className="flex items-center gap-3">
+                <span className="w-40 text-sm font-medium text-gray-700">Technician</span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={newTechPercent}
+                  onChange={(e) => setNewTechPercent(e.target.value)}
+                  placeholder="73"
+                  className="w-28"
+                />
+                <span className="text-sm text-gray-500">%</span>
               </div>
-            )}
+              <div className="flex items-center gap-3">
+                <span className="w-40 text-sm font-medium text-gray-700">Account Holder</span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={newHolderPercent}
+                  onChange={(e) => setNewHolderPercent(e.target.value)}
+                  placeholder="27"
+                  className="w-28"
+                />
+                <span className="text-sm text-gray-500">%</span>
+              </div>
+            </div>
+            <div className="text-sm text-gray-500 bg-gray-50 rounded p-3">
+              Total: <span className={`font-semibold ${
+                Math.abs((parseFloat(newTechPercent) || 0) + (parseFloat(newHolderPercent) || 0) - 100) < 0.01
+                  ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {((parseFloat(newTechPercent) || 0) + (parseFloat(newHolderPercent) || 0)).toFixed(2)}%
+              </span>
+              {' '}(must equal 100%)
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSplitDialogOpen(false)} disabled={savingSplit}>

@@ -19,7 +19,7 @@ route.get('/', async (c) => {
 route.post('/', async (c) => {
   const db = await getDb();
   const body = await c.req.json();
-  const { name, accountHolder, phone, mailingAddress, notes, defaultHourlyRate } = body;
+  const { name, accountHolder, accountHolderId, phone, mailingAddress, notes, defaultHourlyRate, invoicePayableTo } = body;
 
   if (!name) {
     return c.json({ error: 'Client name is required' }, 400);
@@ -35,10 +35,12 @@ route.post('/', async (c) => {
   const [client] = await db.insert(clients).values({
     name,
     accountHolder: accountHolder || null,
+    accountHolderId: accountHolderId || null,
     phone: phone || null,
     mailingAddress: mailingAddress || null,
     notes: notes || null,
     defaultHourlyRate: defaultHourlyRate || null,
+    invoicePayableTo: invoicePayableTo || null,
   }).returning();
 
   return c.json(client, 201);
@@ -65,16 +67,18 @@ route.put('/:id', async (c) => {
   const db = await getDb();
   const id = c.req.param('id');
   const body = await c.req.json();
-  const { name, accountHolder, phone, mailingAddress, isActive, notes, defaultHourlyRate } = body;
+  const { name, accountHolder, accountHolderId, phone, mailingAddress, isActive, notes, defaultHourlyRate, invoicePayableTo } = body;
 
   const updateData: Record<string, unknown> = { updatedAt: new Date() };
   if (name !== undefined) updateData.name = name;
   if (accountHolder !== undefined) updateData.accountHolder = accountHolder;
+  if (accountHolderId !== undefined) updateData.accountHolderId = accountHolderId;
   if (phone !== undefined) updateData.phone = phone;
   if (mailingAddress !== undefined) updateData.mailingAddress = mailingAddress;
   if (isActive !== undefined) updateData.isActive = isActive;
   if (notes !== undefined) updateData.notes = notes;
   if (defaultHourlyRate !== undefined) updateData.defaultHourlyRate = defaultHourlyRate;
+  if (invoicePayableTo !== undefined) updateData.invoicePayableTo = invoicePayableTo;
 
   const [updated] = await db.update(clients)
     .set(updateData)

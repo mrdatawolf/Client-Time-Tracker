@@ -3,21 +3,13 @@
 import { useState } from 'react';
 import { Clock } from 'lucide-react';
 import ClientSelector from '@/components/ClientSelector';
-import DateRangePicker from '@/components/DateRangePicker';
+import DateRangePicker, { getDefaultDateFrom, getDefaultDateTo } from '@/components/DateRangePicker';
 import TimeEntryGrid from '@/components/TimeEntryGrid';
-
-function getMonday(): Date {
-  const today = new Date();
-  const day = today.getDay();
-  const monday = new Date(today);
-  monday.setDate(today.getDate() - (day === 0 ? 6 : day - 1));
-  monday.setHours(0, 0, 0, 0);
-  return monday;
-}
 
 export default function TimeEntryPage() {
   const [clientId, setClientId] = useState('');
-  const [weekStart, setWeekStart] = useState(getMonday);
+  const [dateFrom, setDateFrom] = useState(getDefaultDateFrom);
+  const [dateTo, setDateTo] = useState(getDefaultDateTo);
 
   return (
     <div>
@@ -29,19 +21,22 @@ export default function TimeEntryPage() {
         <p className="text-gray-500 mt-1">Log hours for a client by day</p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-4 mb-6">
+      <div className="flex flex-wrap items-end gap-4 mb-6">
         <ClientSelector
           value={clientId}
           onChange={setClientId}
           className="w-64"
+          allowAll
         />
         <DateRangePicker
-          weekStart={weekStart}
-          onWeekChange={setWeekStart}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          onDateFromChange={setDateFrom}
+          onDateToChange={setDateTo}
         />
       </div>
 
-      <TimeEntryGrid clientId={clientId} weekStart={weekStart} />
+      <TimeEntryGrid clientId={clientId} dateFrom={dateFrom} dateTo={dateTo} />
     </div>
   );
 }

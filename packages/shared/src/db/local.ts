@@ -138,6 +138,12 @@ async function initializeSchema(client: PGlite): Promise<void> {
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS phone TEXT;
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS mailing_address TEXT;
 
+    -- Migrate: add account_holder_id to clients (UUID reference to users)
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS account_holder_id UUID REFERENCES users(id);
+
+    -- Migrate: add invoice_payable_to override per client
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS invoice_payable_to TEXT;
+
     -- Job Types
     CREATE TABLE IF NOT EXISTS job_types (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -363,6 +369,37 @@ async function initializeSchema(client: PGlite): Promise<void> {
     CREATE TRIGGER sync_track_client_chat_logs
       AFTER INSERT OR UPDATE OR DELETE ON client_chat_logs
       FOR EACH ROW EXECUTE FUNCTION sync_changelog_trigger();
+  `);
+
+  // Migrate: add 'partner' role to user_role enum (must be separate exec)
+  try {
+    await client.exec(`ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'partner'`);
+  } catch {
+    // Already exists — safe to ignore
+  }
+
+  // Migrate: promote the first-created admin user to partner
+  await client.exec(`
+    UPDATE users SET role = 'partner'
+    WHERE id = (
+      SELECT id FROM users WHERE role = 'admin' ORDER BY created_at ASC LIMIT 1
+    )
+    AND NOT EXISTS (SELECT 1 FROM users WHERE role = 'partner')
+  `);
+
+  // Migrate: populate account_holder_id from account_holder display name
+  await client.exec(`
+    UPDATE clients SET account_holder_id = u.id
+    FROM users u
+    WHERE clients.account_holder = u.display_name
+      AND clients.account_holder_id IS NULL
+      AND clients.account_holder IS NOT NULL
+  `);
+
+  // Seed default split percentages
+  await client.exec(`
+    INSERT INTO app_settings (key, value) VALUES ('splitTechPercent', '73') ON CONFLICT (key) DO NOTHING;
+    INSERT INTO app_settings (key, value) VALUES ('splitHolderPercent', '27') ON CONFLICT (key) DO NOTHING;
   `);
 }
 

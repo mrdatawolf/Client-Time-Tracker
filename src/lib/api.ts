@@ -9,7 +9,7 @@ export interface User {
   id: string;
   username: string;
   displayName: string;
-  role: 'admin' | 'basic';
+  role: 'partner' | 'admin' | 'basic';
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -19,11 +19,13 @@ export interface Client {
   id: string;
   name: string;
   accountHolder: string | null;
+  accountHolderId: string | null;
   phone: string | null;
   mailingAddress: string | null;
   isActive: boolean;
   notes: string | null;
   defaultHourlyRate: string | null;
+  invoicePayableTo: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -92,13 +94,13 @@ export const clients = {
 
   get: (id: string) => apiClient<Client>(`/api/clients/${id}`),
 
-  create: (data: { name: string; accountHolder?: string; phone?: string; mailingAddress?: string; notes?: string; defaultHourlyRate?: string }) =>
+  create: (data: { name: string; accountHolder?: string; accountHolderId?: string | null; phone?: string; mailingAddress?: string; notes?: string; defaultHourlyRate?: string; invoicePayableTo?: string }) =>
     apiClient<Client>('/api/clients', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  update: (id: string, data: Partial<{ name: string; accountHolder: string; phone: string; mailingAddress: string; isActive: boolean; notes: string; defaultHourlyRate: string | null }>) =>
+  update: (id: string, data: Partial<{ name: string; accountHolder: string; accountHolderId: string | null; phone: string; mailingAddress: string; isActive: boolean; notes: string; defaultHourlyRate: string | null; invoicePayableTo: string | null }>) =>
     apiClient<Client>(`/api/clients/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -183,8 +185,11 @@ export const timeEntries = {
     return apiClient<TimeEntry[]>(`/api/time-entries${qs ? `?${qs}` : ''}`);
   },
 
-  grid: (clientId: string, dateFrom: string, dateTo: string) =>
-    apiClient<TimeEntry[]>(`/api/time-entries/grid?clientId=${clientId}&dateFrom=${dateFrom}&dateTo=${dateTo}`),
+  grid: (dateFrom: string, dateTo: string, clientId?: string) => {
+    const params = new URLSearchParams({ dateFrom, dateTo });
+    if (clientId) params.set('clientId', clientId);
+    return apiClient<TimeEntry[]>(`/api/time-entries/grid?${params.toString()}`);
+  },
 
   get: (id: string) => apiClient<TimeEntry>(`/api/time-entries/${id}`),
 
@@ -361,13 +366,13 @@ export const users = {
 
   get: (id: string) => apiClient<User>(`/api/users/${id}`),
 
-  create: (data: { username: string; displayName: string; password: string; role?: 'admin' | 'basic' }) =>
+  create: (data: { username: string; displayName: string; password: string; role?: 'partner' | 'admin' | 'basic' }) =>
     apiClient<User>('/api/users', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  update: (id: string, data: Partial<{ displayName: string; role: 'admin' | 'basic'; isActive: boolean }>) =>
+  update: (id: string, data: Partial<{ displayName: string; role: 'partner' | 'admin' | 'basic'; isActive: boolean; password: string }>) =>
     apiClient<User>(`/api/users/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -454,14 +459,9 @@ export const reports = {
 
 // --- Partner ---
 
-export interface PartnerSplit {
-  id: string;
-  partnerId: string;
-  splitPercent: string;
-  effectiveFrom: string;
-  effectiveTo: string | null;
-  createdAt: string;
-  partnerName: string;
+export interface SplitConfig {
+  techPercent: number;
+  holderPercent: number;
 }
 
 export interface PartnerSettlement {
@@ -486,15 +486,16 @@ export interface PartnerSummaryItem {
 
 export interface PartnerSummaryResponse {
   totalRevenue: number;
+  splitConfig: SplitConfig;
   period: { dateFrom: string | null; dateTo: string | null };
   partners: PartnerSummaryItem[];
 }
 
 export const partner = {
-  getSplits: () => apiClient<PartnerSplit[]>('/api/partner/splits'),
+  getSplits: () => apiClient<SplitConfig>('/api/partner/splits'),
 
-  setSplits: (data: { splits: { partnerId: string; splitPercent: number }[]; effectiveFrom: string }) =>
-    apiClient<PartnerSplit[]>('/api/partner/splits', {
+  setSplits: (data: SplitConfig) =>
+    apiClient<SplitConfig>('/api/partner/splits', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
