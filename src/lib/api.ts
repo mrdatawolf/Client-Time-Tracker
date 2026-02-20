@@ -676,3 +676,35 @@ export const supabaseSync = {
       body: JSON.stringify({ exportString }),
     }),
 };
+
+// --- Database Management ---
+
+export interface DbInfo {
+  path: string;
+  sizeMB: number;
+  exists: boolean;
+}
+
+export interface DbBackup {
+  name: string;
+  sizeMB: number;
+  createdAt: string;
+}
+
+export const database = {
+  info: () => apiClient<DbInfo>('/api/database/info'),
+
+  backup: () =>
+    apiClient<{ name: string; sizeMB: number }>('/api/database/backup', { method: 'POST' }),
+
+  listBackups: () => apiClient<DbBackup[]>('/api/database/backups'),
+
+  deleteBackup: (name: string) =>
+    apiClient<{ success: boolean }>(`/api/database/backups/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+
+  reset: () =>
+    apiClient<{ success: boolean; message: string }>('/api/database/reset', { method: 'POST' }),
+
+  restore: (name: string) =>
+    apiClient<{ success: boolean; message: string }>(`/api/database/restore/${encodeURIComponent(name)}`, { method: 'POST' }),
+};

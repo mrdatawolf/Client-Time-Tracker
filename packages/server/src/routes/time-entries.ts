@@ -134,6 +134,8 @@ route.post('/', async (c) => {
     return c.json(entry, 201);
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Failed to create time entry';
+    console.error('Time entry creation failed:', msg);
+    console.error('  Values:', JSON.stringify({ clientId, techId: entryTechId, jobTypeId, rateTierId, date, hours }));
     if (msg.includes('foreign key') || msg.includes('violates') || msg.includes('FOREIGN KEY')) {
       return c.json({ error: 'Invalid reference: one of the selected items (client, job type, or rate tier) does not exist.' }, 400);
     }
