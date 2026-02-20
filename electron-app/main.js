@@ -323,25 +323,40 @@ ipcMain.on('close-ready', () => {
   }
 });
 
-ipcMain.on('restart-app', () => {
+ipcMain.on('restart-app', async () => {
   log('Restart requested - relaunching application...');
-  killServers();
+  await Promise.race([killServers(), new Promise((r) => setTimeout(r, 5000))]);
   BrowserWindow.getAllWindows().forEach(window => window.close());
   app.relaunch({ args: process.argv.slice(1).concat(['--relaunch']) });
-  setTimeout(() => app.exit(0), 100);
+  app.exit(0);
 });
 
 function killServers() {
+  const waits = [];
   if (apiServerProcess) {
     log('Killing API server...');
-    apiServerProcess.kill();
+    const proc = apiServerProcess;
     apiServerProcess = null;
+    const p = new Promise((resolve) => {
+      proc.once('close', resolve);
+      // Force-kill after 2 seconds if SIGTERM didn't work
+      setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} }, 2000);
+    });
+    proc.kill();
+    waits.push(p);
   }
   if (webServerProcess) {
     log('Killing web server...');
-    webServerProcess.kill();
+    const proc = webServerProcess;
     webServerProcess = null;
+    const p = new Promise((resolve) => {
+      proc.once('close', resolve);
+      setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} }, 2000);
+    });
+    proc.kill();
+    waits.push(p);
   }
+  return Promise.all(waits);
 }
 
 app.whenReady().then(async () => {
@@ -422,13 +437,12 @@ app.whenReady().then(async () => {
   createWindow(serverUrl);
 });
 
-app.on('window-all-closed', () => {
-  killServers();
+app.on('window-all-closed', async () => {
+  // Wait for child processes to actually exit (up to 5s total)
+  await Promise.race([killServers(), new Promise((r) => setTimeout(r, 5000))]);
   if (process.platform !== 'darwin') {
     app.quit();
   }
-  // Force exit after a short delay to prevent zombie processes
-  setTimeout(() => process.exit(0), 3000);
 });
 
 app.on('activate', () => {
@@ -437,7 +451,8 @@ app.on('activate', () => {
   }
 });
 
-app.on('before-quit', () => {
-  killServers();
+app.on('before-quit', async () => {
+  // killServers() is safe to call multiple times — it no-ops if already killed
+  await Promise.race([killServers(), new Promise((r) => setTimeout(r, 3000))]);
   if (logStream) logStream.end();
 });

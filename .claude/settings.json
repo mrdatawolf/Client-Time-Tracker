@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(identify:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(wc:*)"
     ]
   }
 }

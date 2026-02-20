@@ -23,6 +23,7 @@ import migrateRoutes from './routes/migrate';
 import projectRoutes from './routes/projects';
 import clientChatLogRoutes from './routes/client-chat-logs';
 import supabaseRoutes from './routes/supabase';
+import databaseRoutes from './routes/database';
 import { startSyncScheduler } from '@ctt/shared/db/sync-scheduler';
 
 const app = new Hono<AppEnv>();
@@ -75,6 +76,7 @@ app.route('/api/migrate', migrateRoutes);
 app.route('/api/projects', projectRoutes);
 app.route('/api/client-chat-logs', clientChatLogRoutes);
 app.route('/api/supabase', supabaseRoutes);
+app.route('/api/database', databaseRoutes);
 
 // Global error handler — catch unhandled exceptions and return structured JSON
 app.onError((err, c) => {

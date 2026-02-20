@@ -3,9 +3,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Clock, DollarSign, Users, Plus, FolderKanban } from 'lucide-react';
 import { getUser } from '@/lib/api-client';
-import { timeEntries as timeEntriesApi, clients as clientsApi, projects as projectsApi, type TimeEntry, type Client, type Project, type ProjectStatus } from '@/lib/api';
+import { timeEntries as timeEntriesApi, clients as clientsApi, projects as projectsApi, jobTypes as jobTypesApi, settings as settingsApi, type TimeEntry, type Client, type Project, type ProjectStatus } from '@/lib/api';
 import { formatCurrency, toISODate, getWeekDates } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import OnboardingWizard from '@/components/OnboardingWizard';
 import Link from 'next/link';
 
 export default function Dashboard() {
@@ -17,6 +18,15 @@ export default function Dashboard() {
   const [recentEntries, setRecentEntries] = useState<TimeEntry[]>([]);
   const [recentProjects, setRecentProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Onboarding state
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingNeeds, setOnboardingNeeds] = useState({
+    jobTypes: false,
+    client: false,
+    settings: false,
+  });
+  const [currentSettingsData, setCurrentSettingsData] = useState<Record<string, string>>({});
 
   const loadDashboard = useCallback(async () => {
     try {
@@ -61,6 +71,33 @@ export default function Dashboard() {
         .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
         .slice(0, 5);
       setRecentProjects(sorted);
+
+      // Onboarding check — only if not previously dismissed
+      const dismissed = localStorage.getItem('ctt_onboarding_dismissed');
+      if (!dismissed) {
+        const [jobTypeList, appSettings] = await Promise.all([
+          jobTypesApi.list(),
+          settingsApi.get(),
+        ]);
+        const activeJobTypes = jobTypeList.filter((jt) => jt.isActive);
+        const activeClients = clientList.filter((c) => c.isActive);
+        const needsJT = activeJobTypes.length === 0;
+        const needsClient = activeClients.length === 0;
+        const needsSettings =
+          !appSettings.baseHourlyRate ||
+          !appSettings.companyName ||
+          !appSettings.invoicePayableTo;
+
+        if (needsJT || needsClient || needsSettings) {
+          setOnboardingNeeds({
+            jobTypes: needsJT,
+            client: needsClient,
+            settings: needsSettings,
+          });
+          setCurrentSettingsData(appSettings);
+          setShowOnboarding(true);
+        }
+      }
     } catch (err) {
       console.error('Failed to load dashboard:', err);
     } finally {
@@ -79,8 +116,23 @@ export default function Dashboard() {
     { label: 'Clients', value: String(clientCount), icon: Users, color: 'bg-purple-500' },
   ];
 
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false);
+    localStorage.setItem('ctt_onboarding_dismissed', 'true');
+    loadDashboard();
+  };
+
   return (
     <div>
+      {showOnboarding && (
+        <OnboardingWizard
+          needsJobTypes={onboardingNeeds.jobTypes}
+          needsClient={onboardingNeeds.client}
+          needsSettings={onboardingNeeds.settings}
+          currentSettings={currentSettingsData}
+          onComplete={handleOnboardingComplete}
+        />
+      )}
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
