@@ -84,6 +84,7 @@ function GeneralTab() {
   const [baseRate, setBaseRate] = useState('185');
   const [companyName, setCompanyName] = useState('');
   const [payableTo, setPayableTo] = useState('');
+  const [autoInvoiceMinHours, setAutoInvoiceMinHours] = useState('0.5');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -95,6 +96,7 @@ function GeneralTab() {
       if (data.baseHourlyRate) setBaseRate(data.baseHourlyRate);
       if (data.companyName) setCompanyName(data.companyName);
       if (data.invoicePayableTo) setPayableTo(data.invoicePayableTo);
+      if (data.autoInvoiceMinHours) setAutoInvoiceMinHours(data.autoInvoiceMinHours);
     } catch (err) {
       console.error('Failed to load settings:', err);
     } finally {
@@ -112,6 +114,7 @@ function GeneralTab() {
         baseHourlyRate: baseRate,
         companyName,
         invoicePayableTo: payableTo,
+        autoInvoiceMinHours,
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -178,11 +181,36 @@ function GeneralTab() {
         </div>
       </div>
 
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Auto-Invoicing</h2>
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Minimum Hours Threshold</label>
+            <Input
+              type="number"
+              step="0.1"
+              min="0"
+              value={autoInvoiceMinHours}
+              onChange={(e) => setAutoInvoiceMinHours(e.target.value)}
+              placeholder="0.5"
+            />
+            <p className="text-xs text-gray-500">
+              Skip auto-generation if a client has fewer unbilled hours than this threshold.
+              Set to 0 to always generate.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="flex items-center gap-3">
         <Button onClick={handleSave} disabled={saving}>
           {saving ? 'Saving...' : 'Save'}
         </Button>
         {saved && <span className="text-sm text-green-600">Saved</span>}
+      </div>
+
+      <div className="text-xs text-gray-400 mt-4">
+        Version {process.env.NEXT_PUBLIC_APP_VERSION || 'dev'}
       </div>
     </div>
   );

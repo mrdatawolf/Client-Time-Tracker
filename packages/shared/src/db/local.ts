@@ -401,6 +401,51 @@ async function initializeSchema(client: PGlite): Promise<void> {
     INSERT INTO app_settings (key, value) VALUES ('splitTechPercent', '73') ON CONFLICT (key) DO NOTHING;
     INSERT INTO app_settings (key, value) VALUES ('splitHolderPercent', '27') ON CONFLICT (key) DO NOTHING;
   `);
+
+  // Migrate: add billing_cycle and billing_day to clients for auto-invoicing
+  await client.exec(`
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS billing_cycle TEXT;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS billing_day NUMERIC(2, 0);
+  `);
+
+  // Migrate: add is_auto_generated flag to invoices
+  await client.exec(`
+    ALTER TABLE invoices ADD COLUMN IF NOT EXISTS is_auto_generated BOOLEAN NOT NULL DEFAULT false;
+  `);
+
+  // Auto-invoice log table
+  await client.exec(`
+    CREATE TABLE IF NOT EXISTS auto_invoice_log (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      client_id UUID NOT NULL REFERENCES clients(id),
+      invoice_id UUID REFERENCES invoices(id),
+      billing_period_start DATE NOT NULL,
+      billing_period_end DATE NOT NULL,
+      status TEXT NOT NULL,
+      message TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+    );
+  `);
+
+  // Seed default auto-invoice minimum hours threshold
+  await client.exec(`
+    INSERT INTO app_settings (key, value) VALUES ('autoInvoiceMinHours', '0.5') ON CONFLICT (key) DO NOTHING;
+  `);
+
+  // One-time data cleanup: mark all pre-2026 time entries as billed and paid (runs once)
+  const migrationCheck = await client.query(`SELECT value FROM app_settings WHERE key = 'migration_pre2026_paid'`);
+  if (migrationCheck.rows.length === 0) {
+    await client.exec(`
+      UPDATE time_entries SET is_billed = true, is_paid = true, updated_at = NOW() WHERE date < '2026-01-01' AND (is_paid = false OR is_billed = false);
+      UPDATE invoices SET status = 'paid', updated_at = NOW()
+        WHERE status NOT IN ('paid', 'void')
+        AND id IN (
+          SELECT DISTINCT invoice_id FROM time_entries
+          WHERE invoice_id IS NOT NULL AND date < '2026-01-01'
+        );
+      INSERT INTO app_settings (key, value) VALUES ('migration_pre2026_paid', 'done') ON CONFLICT (key) DO NOTHING;
+    `);
+  }
 }
 
 async function initializeLocalDb(): Promise<ReturnType<typeof drizzle<typeof allSchema>>> {

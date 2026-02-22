@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/Sidebar';
 import { SyncOverlay } from '@/components/SyncOverlay';
+import { Toaster } from 'sonner';
 import { isAuthenticated } from '@/lib/api-client';
 import { supabaseSync } from '@/lib/api';
 
@@ -94,6 +95,7 @@ export default function AppLayout({
 
   return (
     <div className="flex h-screen overflow-hidden">
+      <Toaster position="top-right" richColors />
       <SyncOverlay visible={syncing} message={syncMessage} />
       <Sidebar />
       <main className="flex-1 overflow-auto bg-gray-50 p-6">

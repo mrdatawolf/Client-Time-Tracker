@@ -38,12 +38,12 @@ const TABLES_WITH_CREATED_AT_ONLY = new Set([
 function getTableColumns(tableName: string): string[] {
   const columnMap: Record<string, string[]> = {
     users: ['id', 'username', 'display_name', 'password_hash', 'role', 'is_active', 'created_at', 'updated_at'],
-    clients: ['id', 'name', 'account_holder', 'account_holder_id', 'phone', 'mailing_address', 'is_active', 'notes', 'default_hourly_rate', 'invoice_payable_to', 'created_at', 'updated_at'],
+    clients: ['id', 'name', 'account_holder', 'account_holder_id', 'phone', 'mailing_address', 'is_active', 'notes', 'default_hourly_rate', 'invoice_payable_to', 'billing_cycle', 'billing_day', 'created_at', 'updated_at'],
     job_types: ['id', 'name', 'description', 'is_active', 'created_at'],
     rate_tiers: ['id', 'amount', 'label', 'is_active', 'created_at'],
     projects: ['id', 'client_id', 'name', 'status', 'assigned_to', 'note', 'is_active', 'created_at', 'updated_at'],
     client_chat_logs: ['id', 'client_id', 'content', 'updated_at'],
-    invoices: ['id', 'client_id', 'invoice_number', 'date_issued', 'date_due', 'status', 'notes', 'created_at', 'updated_at'],
+    invoices: ['id', 'client_id', 'invoice_number', 'date_issued', 'date_due', 'status', 'notes', 'is_auto_generated', 'created_at', 'updated_at'],
     time_entries: ['id', 'client_id', 'tech_id', 'job_type_id', 'rate_tier_id', 'date', 'hours', 'notes', 'group_id', 'is_billed', 'is_paid', 'invoice_id', 'created_at', 'updated_at'],
     invoice_line_items: ['id', 'invoice_id', 'time_entry_id', 'description', 'hours', 'rate', 'created_at'],
     payments: ['id', 'invoice_id', 'amount', 'date_paid', 'method', 'notes', 'created_at'],
@@ -73,11 +73,19 @@ export async function pushChanges(): Promise<{ pushed: number; skipped: number }
     latestByRecord.set(key, entry);
   }
 
+  // Sort entries by SYNC_TABLE_ORDER so parents are pushed before children (avoids FK violations)
+  const tableOrderIndex = new Map<string, number>(SYNC_TABLE_ORDER.map((t, i) => [t, i]));
+  const orderedEntries = [...latestByRecord.values()].sort((a, b) => {
+    const aIdx = tableOrderIndex.get(a.table_name) ?? 999;
+    const bIdx = tableOrderIndex.get(b.table_name) ?? 999;
+    return aIdx - bIdx;
+  });
+
   let pushed = 0;
   let skipped = 0;
   const syncedIds: number[] = pending.map(e => e.id);
 
-  for (const [, entry] of latestByRecord) {
+  for (const entry of orderedEntries) {
     try {
       if (entry.operation === 'DELETE') {
         // For soft-delete tables, we push the is_active=false state via UPDATE
@@ -442,6 +450,17 @@ async function upsertToRemote(pool: any, tableName: string, record: Record<strin
     if (col !== 'id') {
       updateParts.push(`${col} = $${i + 1}`);
     }
+  }
+
+  // For invoices, handle the unique invoice_number constraint:
+  // If a different row already has this invoice_number, update that row's invoice_number
+  // to allow our upsert to proceed (the ON CONFLICT id will then set the correct value).
+  if (tableName === 'invoices' && record.invoice_number) {
+    await pool.query(
+      `UPDATE invoices SET invoice_number = invoice_number || '_dup_' || id
+       WHERE invoice_number = $1 AND id != $2`,
+      [record.invoice_number, record.id]
+    );
   }
 
   const sql = `
