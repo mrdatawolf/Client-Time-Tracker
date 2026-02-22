@@ -75,9 +75,11 @@
   "nsis": {
     "oneClick": false,
     "allowToChangeInstallationDirectory": true,
+    "allowElevation": true,
     "installerIcon": "build/icon.ico",
     "uninstallerIcon": "build/icon.ico",
-    "installerHeaderIcon": "build/icon.ico"
+    "installerHeaderIcon": "build/icon.ico",
+    "include": "build/installer.nsh"
   },
   "linux": {
     "icon": "build/icon.png",

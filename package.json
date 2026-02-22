@@ -1,6 +1,6 @@
 {
   "name": "client-time-tracker",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": true,
   "packageManager": "pnpm@10.28.2",
   "scripts": {
@@ -17,7 +17,7 @@
     "build:server": "node scripts/bundle-api-server.js",
     "build:standalone": "node scripts/package-standalone.js",
     "electron:start": "electron electron-app",
-    "electron:build": "node scripts/sync-version.js && electron-builder --config electron-builder.json",
+    "electron:build": "node scripts/sync-version.js && node scripts/patch-nsis-template.js && electron-builder --config electron-builder.json",
     "server:installer": "node scripts/build-server-installer.js",
     "server:installer:linux": "node scripts/build-linux-server-packages.js",
     "build:all": "pnpm run clean && pnpm run build && pnpm run build:server && pnpm run build:standalone && pnpm run electron:build && pnpm run server:installer && node scripts/copy-to-distribute.js",
