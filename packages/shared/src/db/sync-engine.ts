@@ -436,6 +436,41 @@ export async function runInitialSync(direction: 'push' | 'pull' | 'merge'): Prom
 // HELPERS
 // ============================================================================
 
+/** Columns that are PostgreSQL DATE type (no time component).
+ *  The pg driver returns these as JS Date objects at midnight UTC,
+ *  which can shift when interpreted in a different timezone.
+ *  We normalize them to plain 'YYYY-MM-DD' strings to prevent drift. */
+const DATE_ONLY_COLUMNS = new Set([
+  'date',                  // time_entries.date
+  'date_issued',           // invoices.date_issued
+  'date_due',              // invoices.date_due
+  'date_paid',             // payments.date_paid
+  'effective_from',        // partner_splits.effective_from
+  'effective_to',          // partner_splits.effective_to
+  'billing_period_start',  // auto_invoice_log.billing_period_start
+  'billing_period_end',    // auto_invoice_log.billing_period_end
+]);
+
+/** Convert a value to a plain 'YYYY-MM-DD' string if it's a Date object
+ *  for a DATE-only column, using UTC components to avoid timezone shift. */
+function normalizeDateValue(col: string, value: any): any {
+  if (value == null) return value;
+  if (!DATE_ONLY_COLUMNS.has(col)) return value;
+
+  if (value instanceof Date) {
+    // Use UTC components to get the correct date regardless of local timezone
+    const y = value.getUTCFullYear();
+    const m = String(value.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(value.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  // If it's already a string like '2026-02-21', return as-is
+  if (typeof value === 'string') return value;
+
+  return value;
+}
+
 /** Upsert a record into the remote Supabase database */
 async function upsertToRemote(pool: any, tableName: string, record: Record<string, any>): Promise<void> {
   const columns = getTableColumns(tableName);
@@ -445,7 +480,7 @@ async function upsertToRemote(pool: any, tableName: string, record: Record<strin
 
   for (let i = 0; i < columns.length; i++) {
     const col = columns[i];
-    values.push(record[col] ?? null);
+    values.push(normalizeDateValue(col, record[col] ?? null));
     placeholders.push(`$${i + 1}`);
     if (col !== 'id') {
       updateParts.push(`${col} = $${i + 1}`);
@@ -485,7 +520,7 @@ async function upsertToLocal(
 
   for (let i = 0; i < columns.length; i++) {
     const col = columns[i];
-    values.push(record[col] ?? null);
+    values.push(normalizeDateValue(col, record[col] ?? null));
     placeholders.push(`$${i + 1}`);
     if (col !== 'id') {
       updateParts.push(`${col} = $${i + 1}`);

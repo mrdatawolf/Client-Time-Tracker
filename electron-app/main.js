@@ -38,6 +38,12 @@ const store = new SimpleStore({
   jwtSecret: null
 });
 
+// Single-instance lock: prevent multiple instances and allow installer to detect us
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+}
+
 let mainWindow;
 let settingsWindow;
 let apiServerProcess;
@@ -331,33 +337,56 @@ ipcMain.on('restart-app', async () => {
   app.exit(0);
 });
 
+function killProcess(label, proc) {
+  return new Promise((resolve) => {
+    proc.once('close', resolve);
+
+    if (process.platform === 'win32') {
+      // On Windows, SIGTERM/SIGKILL don't propagate to child process trees.
+      // Use taskkill /T /F to force-kill the process and its entire tree.
+      const { execSync } = require('child_process');
+      try {
+        execSync(`taskkill /PID ${proc.pid} /T /F`, { stdio: 'ignore' });
+        log(`[${label}] taskkill sent for PID ${proc.pid}`);
+      } catch {
+        // Process may have already exited
+        log(`[${label}] taskkill failed (process may have already exited)`);
+      }
+    } else {
+      proc.kill();
+      // Force-kill after 2 seconds if SIGTERM didn't work
+      setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} }, 2000);
+    }
+
+    // Safety: resolve after 3 seconds even if 'close' never fires
+    setTimeout(resolve, 3000);
+  });
+}
+
 function killServers() {
   const waits = [];
   if (apiServerProcess) {
     log('Killing API server...');
     const proc = apiServerProcess;
     apiServerProcess = null;
-    const p = new Promise((resolve) => {
-      proc.once('close', resolve);
-      // Force-kill after 2 seconds if SIGTERM didn't work
-      setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} }, 2000);
-    });
-    proc.kill();
-    waits.push(p);
+    waits.push(killProcess('API', proc));
   }
   if (webServerProcess) {
     log('Killing web server...');
     const proc = webServerProcess;
     webServerProcess = null;
-    const p = new Promise((resolve) => {
-      proc.once('close', resolve);
-      setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} }, 2000);
-    });
-    proc.kill();
-    waits.push(p);
+    waits.push(killProcess('WEB', proc));
   }
   return Promise.all(waits);
 }
+
+app.on('second-instance', () => {
+  // Someone tried to run a second instance — focus our window instead
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  }
+});
 
 app.whenReady().then(async () => {
   initLog();
