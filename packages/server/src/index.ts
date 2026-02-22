@@ -25,6 +25,7 @@ import clientChatLogRoutes from './routes/client-chat-logs';
 import supabaseRoutes from './routes/supabase';
 import databaseRoutes from './routes/database';
 import { startSyncScheduler } from '@ctt/shared/db/sync-scheduler';
+import { startAutoInvoiceScheduler } from './lib/auto-invoice-scheduler';
 
 const app = new Hono<AppEnv>();
 
@@ -99,6 +100,9 @@ serve({
 
   // Start Supabase sync scheduler (no-op if not configured)
   startSyncScheduler();
+
+  // Start auto-invoice scheduler (checks hourly for clients with billing cycles)
+  startAutoInvoiceScheduler();
 });
 
 export default app;

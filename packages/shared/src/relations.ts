@@ -13,6 +13,7 @@ import {
   auditLog,
   projects,
   clientChatLogs,
+  autoInvoiceLog,
 } from './schema';
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -73,4 +74,9 @@ export const projectsRelations = relations(projects, ({ one }) => ({
 
 export const clientChatLogsRelations = relations(clientChatLogs, ({ one }) => ({
   client: one(clients, { fields: [clientChatLogs.clientId], references: [clients.id] }),
+}));
+
+export const autoInvoiceLogRelations = relations(autoInvoiceLog, ({ one }) => ({
+  client: one(clients, { fields: [autoInvoiceLog.clientId], references: [clients.id] }),
+  invoice: one(invoices, { fields: [autoInvoiceLog.invoiceId], references: [invoices.id] }),
 }));

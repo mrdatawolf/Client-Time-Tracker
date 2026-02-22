@@ -1,10 +1,10 @@
 {
   "name": "client-time-tracker",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "packageManager": "pnpm@10.28.2",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --port 3700",
     "dev:server": "pnpm --filter @ctt/server dev",
     "dev:all": "node scripts/dev.js",
     "build": "next build",
@@ -38,6 +38,7 @@
     "next": "^16.1.1",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^2.2.1"
   },
   "pnpm": {
@@ -54,10 +55,10 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "eslint": "^9",
     "electron": "^39.2.7",
     "electron-builder": "^26.0.12",
     "esbuild": "^0.25.0",
+    "eslint": "^9",
     "eslint-config-next": "^16.1.1",
     "tailwindcss": "^4",
     "typescript": "^5",

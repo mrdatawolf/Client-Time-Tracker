@@ -202,8 +202,11 @@ export default function TimeEntryGrid({ clientId, dateFrom, dateTo }: TimeEntryG
             <span className="text-gray-500">{entry.hours}h</span>
             {entry.total && <span className="text-gray-600 font-medium">{formatCurrency(parseFloat(entry.total))}</span>}
             <div className="flex gap-1">
-              {entry.isBilled && <span className="px-1 py-0 rounded text-[10px] bg-blue-100 text-blue-600">Billed</span>}
-              {entry.isPaid && <span className="px-1 py-0 rounded text-[10px] bg-green-100 text-green-600">Paid</span>}
+              {(entry.invoicePaid || entry.isPaid) ? (
+                <span className="px-1 py-0 rounded text-[10px] bg-green-100 text-green-600">Paid</span>
+              ) : entry.isBilled ? (
+                <span className="px-1 py-0 rounded text-[10px] bg-blue-100 text-blue-600">Billed</span>
+              ) : null}
             </div>
             {admin && (
               <span onClick={(e) => toggleSelect(entry.id, e)}>
@@ -244,8 +247,11 @@ export default function TimeEntryGrid({ clientId, dateFrom, dateTo }: TimeEntryG
         <div className="flex items-center justify-between">
           <span className="text-gray-500">{entry.hours}h</span>
           <div className="flex items-center gap-1">
-            {entry.isBilled && <span className="px-1 py-0 rounded text-[10px] bg-blue-100 text-blue-600">B</span>}
-            {entry.isPaid && <span className="px-1 py-0 rounded text-[10px] bg-green-100 text-green-600">P</span>}
+            {(entry.invoicePaid || entry.isPaid) ? (
+              <span className="px-1 py-0 rounded text-[10px] bg-green-100 text-green-600">P</span>
+            ) : entry.isBilled ? (
+              <span className="px-1 py-0 rounded text-[10px] bg-blue-100 text-blue-600">B</span>
+            ) : null}
             {entry.total && <span className="text-gray-600 font-medium">{formatCurrency(parseFloat(entry.total))}</span>}
           </div>
         </div>

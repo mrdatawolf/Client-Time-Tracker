@@ -304,6 +304,8 @@ function getSchemaSQL(): string {
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS mailing_address TEXT;
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS account_holder_id UUID REFERENCES users(id);
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS invoice_payable_to TEXT;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS billing_cycle TEXT;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS billing_day NUMERIC(2, 0);
 
     -- Job Types
     CREATE TABLE IF NOT EXISTS job_types (
@@ -335,6 +337,7 @@ function getSchemaSQL(): string {
       created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
       updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
     );
+    ALTER TABLE invoices ADD COLUMN IF NOT EXISTS is_auto_generated BOOLEAN NOT NULL DEFAULT false;
 
     -- Time Entries
     CREATE TABLE IF NOT EXISTS time_entries (

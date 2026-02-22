@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { eq, and, sql, desc } from 'drizzle-orm';
 import { getDb } from '@ctt/shared/db';
-import { timeEntries, rateTiers, clients, users, jobTypes } from '@ctt/shared/schema';
+import { timeEntries, rateTiers, clients, users, jobTypes, invoices, invoiceLineItems, payments } from '@ctt/shared/schema';
 import { requireAdmin, getUserId, getUserRole, isAtLeastAdmin } from '../middleware/auth';
 import type { AppEnv } from '../types';
 
@@ -22,6 +22,8 @@ app.get('/client-summary', requireAdmin(), async (c) => {
     clientName: clients.name,
     hours: timeEntries.hours,
     rate: rateTiers.amount,
+    isBilled: timeEntries.isBilled,
+    isPaid: timeEntries.isPaid,
   })
     .from(timeEntries)
     .innerJoin(clients, eq(timeEntries.clientId, clients.id))
@@ -29,7 +31,7 @@ app.get('/client-summary', requireAdmin(), async (c) => {
     .where(conditions.length > 0 ? and(...conditions) : undefined);
 
   // Group by client
-  const grouped = new Map<string, { clientId: string; clientName: string; totalHours: number; totalRevenue: number; entryCount: number }>();
+  const grouped = new Map<string, { clientId: string; clientName: string; totalHours: number; totalRevenue: number; entryCount: number; unbilledCount: number; billedCount: number; paidCount: number }>();
 
   for (const entry of entries) {
     const existing = grouped.get(entry.clientId) || {
@@ -38,10 +40,20 @@ app.get('/client-summary', requireAdmin(), async (c) => {
       totalHours: 0,
       totalRevenue: 0,
       entryCount: 0,
+      unbilledCount: 0,
+      billedCount: 0,
+      paidCount: 0,
     };
     existing.totalHours += Number(entry.hours);
     existing.totalRevenue += Number(entry.hours) * Number(entry.rate);
     existing.entryCount += 1;
+    if (entry.isPaid) {
+      existing.paidCount += 1;
+    } else if (entry.isBilled) {
+      existing.billedCount += 1;
+    } else {
+      existing.unbilledCount += 1;
+    }
     grouped.set(entry.clientId, existing);
   }
 
@@ -63,6 +75,8 @@ app.get('/tech-summary', requireAdmin(), async (c) => {
     techName: users.displayName,
     hours: timeEntries.hours,
     rate: rateTiers.amount,
+    isBilled: timeEntries.isBilled,
+    isPaid: timeEntries.isPaid,
   })
     .from(timeEntries)
     .innerJoin(users, eq(timeEntries.techId, users.id))
@@ -70,7 +84,7 @@ app.get('/tech-summary', requireAdmin(), async (c) => {
     .where(conditions.length > 0 ? and(...conditions) : undefined);
 
   // Group by tech
-  const grouped = new Map<string, { techId: string; techName: string; totalHours: number; totalRevenue: number; entryCount: number }>();
+  const grouped = new Map<string, { techId: string; techName: string; totalHours: number; totalRevenue: number; entryCount: number; unbilledCount: number; billedCount: number; paidCount: number }>();
 
   for (const entry of entries) {
     const existing = grouped.get(entry.techId) || {
@@ -79,10 +93,20 @@ app.get('/tech-summary', requireAdmin(), async (c) => {
       totalHours: 0,
       totalRevenue: 0,
       entryCount: 0,
+      unbilledCount: 0,
+      billedCount: 0,
+      paidCount: 0,
     };
     existing.totalHours += Number(entry.hours);
     existing.totalRevenue += Number(entry.hours) * Number(entry.rate);
     existing.entryCount += 1;
+    if (entry.isPaid) {
+      existing.paidCount += 1;
+    } else if (entry.isBilled) {
+      existing.billedCount += 1;
+    } else {
+      existing.unbilledCount += 1;
+    }
     grouped.set(entry.techId, existing);
   }
 
@@ -191,6 +215,132 @@ app.get('/export', async (c) => {
       'Content-Disposition': `attachment; filename="time-report-${dateFrom || 'all'}-${dateTo || 'all'}.csv"`,
     },
   });
+});
+
+// Balance report: outstanding (unbilled + billed-unpaid) entries for a client
+app.get('/balance', requireAdmin(), async (c) => {
+  const db = await getDb();
+  const clientId = c.req.query('clientId');
+  const filter = c.req.query('filter') || 'all'; // 'all' | 'unbilled' | 'unpaid' | 'paid'
+
+  if (!clientId) {
+    return c.json({ error: 'clientId is required' }, 400);
+  }
+
+  const localClient = (db as any)._.session.client;
+
+  let statusCondition = '';
+  if (filter === 'unbilled') {
+    statusCondition = 'AND te.is_paid = false AND te.is_billed = false';
+  } else if (filter === 'unpaid') {
+    statusCondition = 'AND te.is_paid = false AND te.is_billed = true AND (i.status IS NULL OR i.status NOT IN (\'paid\', \'void\'))';
+  } else if (filter === 'paid') {
+    statusCondition = 'AND te.is_paid = true';
+  } else {
+    // all outstanding (default)
+    statusCondition = `AND te.is_paid = false AND (
+      te.is_billed = false
+      OR (te.is_billed = true AND (i.status IS NULL OR i.status NOT IN ('paid', 'void')))
+    )`;
+  }
+
+  const result = await localClient.query(`
+    SELECT
+      te.id,
+      te.date,
+      te.hours,
+      te.notes,
+      te.is_billed,
+      te.is_paid,
+      te.invoice_id,
+      te.rate_tier_id,
+      te.job_type_id,
+      rt.amount AS rate,
+      u.display_name AS tech_name,
+      jt.name AS job_type_name,
+      cl.name AS client_name,
+      i.invoice_number,
+      i.status AS invoice_status,
+      (CAST(te.hours AS NUMERIC) * CAST(rt.amount AS NUMERIC)) AS total
+    FROM time_entries te
+    JOIN rate_tiers rt ON rt.id = te.rate_tier_id
+    JOIN users u ON u.id = te.tech_id
+    JOIN job_types jt ON jt.id = te.job_type_id
+    JOIN clients cl ON cl.id = te.client_id
+    LEFT JOIN invoices i ON i.id = te.invoice_id
+    WHERE te.client_id = $1
+    ${statusCondition}
+    ORDER BY te.date DESC
+  `, [clientId]);
+
+  return c.json(result.rows.map((row: any) => ({
+    id: row.id,
+    date: row.date instanceof Date ? row.date.toISOString().split('T')[0] : String(row.date).split('T')[0],
+    clientName: row.client_name,
+    techName: row.tech_name,
+    jobTypeName: row.job_type_name,
+    hours: row.hours,
+    rate: row.rate,
+    total: Number(row.total).toFixed(2),
+    notes: row.notes,
+    isBilled: row.is_billed,
+    isPaid: row.is_paid,
+    invoiceId: row.invoice_id,
+    invoiceNumber: row.invoice_number,
+    invoiceStatus: row.invoice_status,
+    rateTierId: row.rate_tier_id,
+    jobTypeId: row.job_type_id,
+  })));
+});
+
+// Mark an invoice as paid (quick action from balance report)
+app.post('/balance/mark-paid', requireAdmin(), async (c) => {
+  const db = await getDb();
+  const body = await c.req.json();
+  const { invoiceId } = body;
+
+  if (!invoiceId) {
+    return c.json({ error: 'invoiceId is required' }, 400);
+  }
+
+  // Get invoice
+  const [invoice] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
+  if (!invoice) {
+    return c.json({ error: 'Invoice not found' }, 404);
+  }
+  if (invoice.status === 'paid') {
+    return c.json({ error: 'Invoice is already paid' }, 400);
+  }
+
+  // Compute invoice total from line items
+  const lines = await db.select().from(invoiceLineItems)
+    .where(eq(invoiceLineItems.invoiceId, invoiceId));
+  const invoiceTotal = lines.reduce((sum, l) => sum + Number(l.hours) * Number(l.rate), 0);
+
+  // Get existing payments
+  const existingPayments = await db.select().from(payments)
+    .where(eq(payments.invoiceId, invoiceId));
+  const totalPaid = existingPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+
+  const remaining = invoiceTotal - totalPaid;
+
+  if (remaining > 0) {
+    // Record a payment for the remaining amount
+    await db.insert(payments).values({
+      invoiceId,
+      amount: String(remaining.toFixed(2)),
+      datePaid: new Date().toISOString().split('T')[0],
+      method: null,
+      notes: 'Marked as paid from balance report',
+    });
+  }
+
+  // Mark invoice as paid
+  await db.update(invoices)
+    .set({ status: 'paid', updatedAt: new Date() })
+    .where(eq(invoices.id, invoiceId));
+
+  return c.json({ success: true });
 });
 
 export default app;

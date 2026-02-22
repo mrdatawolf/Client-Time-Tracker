@@ -40,16 +40,18 @@ route.get('/', async (c) => {
       tech: { columns: { id: true, username: true, displayName: true, role: true, isActive: true } },
       jobType: true,
       rateTier: true,
+      invoice: { columns: { id: true, status: true } },
     },
     orderBy: (timeEntries, { desc }) => [desc(timeEntries.date)],
   });
 
-  // Compute totals
-  const result = entries.map(entry => ({
+  // Compute totals and derive invoicePaid from linked invoice status
+  const result = entries.map(({ invoice, ...entry }) => ({
     ...entry,
     total: entry.rateTier
       ? String(parseFloat(entry.hours) * parseFloat(entry.rateTier.amount))
       : null,
+    invoicePaid: invoice?.status === 'paid',
   }));
 
   return c.json(result);
@@ -89,15 +91,17 @@ route.get('/grid', async (c) => {
       tech: { columns: { id: true, displayName: true } },
       jobType: true,
       rateTier: true,
+      invoice: { columns: { id: true, status: true } },
     },
     orderBy: (timeEntries, { asc }) => [asc(timeEntries.date)],
   });
 
-  const result = entries.map(entry => ({
+  const result = entries.map(({ invoice, ...entry }) => ({
     ...entry,
     total: entry.rateTier
       ? String(parseFloat(entry.hours) * parseFloat(entry.rateTier.amount))
       : null,
+    invoicePaid: invoice?.status === 'paid',
   }));
 
   return c.json(result);

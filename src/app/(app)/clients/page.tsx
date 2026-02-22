@@ -13,6 +13,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { clients as clientsApi, users as usersApi, type Client, type User } from '@/lib/api';
+import { formatCurrency } from '@/lib/utils';
 import {
   Select,
   SelectContent,
@@ -34,6 +35,8 @@ export default function ClientsPage() {
   const [formNotes, setFormNotes] = useState('');
   const [formRate, setFormRate] = useState('');
   const [formPayableTo, setFormPayableTo] = useState('');
+  const [formBillingCycle, setFormBillingCycle] = useState('');
+  const [formBillingDay, setFormBillingDay] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [partners, setPartners] = useState<User[]>([]);
@@ -82,6 +85,8 @@ export default function ClientsPage() {
     setFormNotes('');
     setFormRate('');
     setFormPayableTo('');
+    setFormBillingCycle('');
+    setFormBillingDay('');
     setError('');
     setDialogOpen(true);
   }
@@ -95,6 +100,8 @@ export default function ClientsPage() {
     setFormNotes(client.notes || '');
     setFormRate(client.defaultHourlyRate || '');
     setFormPayableTo(client.invoicePayableTo || '');
+    setFormBillingCycle(client.billingCycle || '');
+    setFormBillingDay(client.billingDay || '');
     setError('');
     setDialogOpen(true);
   }
@@ -118,6 +125,8 @@ export default function ClientsPage() {
           notes: formNotes.trim() || undefined,
           defaultHourlyRate: formRate.trim() || null,
           invoicePayableTo: formPayableTo.trim() || null,
+          billingCycle: formBillingCycle || null,
+          billingDay: formBillingCycle ? (parseInt(formBillingDay) || 1) : null,
         });
       } else {
         await clientsApi.create({
@@ -129,6 +138,8 @@ export default function ClientsPage() {
           notes: formNotes.trim() || undefined,
           defaultHourlyRate: formRate.trim() || undefined,
           invoicePayableTo: formPayableTo.trim() || undefined,
+          billingCycle: formBillingCycle || null,
+          billingDay: formBillingCycle ? (parseInt(formBillingDay) || 1) : null,
         });
       }
       setDialogOpen(false);
@@ -191,69 +202,102 @@ export default function ClientsPage() {
         <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500">
           Loading...
         </div>
+      ) : activeClients.length === 0 ? (
+        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500">
+          {search ? 'No clients match your search' : 'No clients yet. Click "Add Client" to create one.'}
+        </div>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="px-4 py-3 text-left font-medium text-gray-600">Name</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">Account Holder</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">Notes</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-600">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {activeClients.map((client) => (
-                <tr key={client.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium">{client.name}</td>
-                  <td className="px-4 py-3 text-gray-600">{getHolderName(client)}</td>
-                  <td className="px-4 py-3 text-gray-500 max-w-xs truncate">{client.notes || '-'}</td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => openEdit(client)}>
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDeactivate(client)}>
-                        <Trash2 className="w-4 h-4 text-red-500" />
-                      </Button>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {activeClients.map((client) => (
+              <div
+                key={client.id}
+                className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-4 flex flex-col"
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <h3 className="font-semibold text-gray-900 truncate flex-1">{client.name}</h3>
+                  <div className="flex items-center gap-0.5 ml-2 flex-shrink-0">
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(client)}>
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDeactivate(client)}>
+                      <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="text-xs text-gray-500 space-y-1 flex-1">
+                  <div className="flex items-center gap-1">
+                    <span className="font-medium text-gray-600">Holder:</span>
+                    <span className="truncate">{getHolderName(client)}</span>
+                  </div>
+                  {client.phone && (
+                    <div className="flex items-center gap-1">
+                      <span className="font-medium text-gray-600">Phone:</span>
+                      <span className="truncate">{client.phone}</span>
                     </div>
-                  </td>
-                </tr>
-              ))}
-              {activeClients.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
-                    {search ? 'No clients match your search' : 'No clients yet. Click "Add Client" to create one.'}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                  )}
+                  {client.defaultHourlyRate && (
+                    <div className="flex items-center gap-1">
+                      <span className="font-medium text-gray-600">Rate:</span>
+                      <span>${client.defaultHourlyRate}/hr</span>
+                    </div>
+                  )}
+                  {client.billingCycle && (
+                    <div className="flex items-center gap-1">
+                      <span className="font-medium text-gray-600">Billing:</span>
+                      <span className="capitalize">{client.billingCycle}</span>
+                    </div>
+                  )}
+                </div>
+                {(parseFloat(client.unbilledTotal || '0') > 0 || parseFloat(client.billedUnpaidTotal || '0') > 0) && (
+                  <div className="flex gap-3 mt-2 pt-2 border-t border-gray-100 text-xs">
+                    {parseFloat(client.unbilledTotal || '0') > 0 && (
+                      <div className="flex items-center gap-1">
+                        <span className="inline-block w-2 h-2 rounded-full bg-amber-400" />
+                        <span className="text-gray-500">Unbilled</span>
+                        <span className="font-medium text-amber-700">{formatCurrency(parseFloat(client.unbilledTotal!))}</span>
+                      </div>
+                    )}
+                    {parseFloat(client.billedUnpaidTotal || '0') > 0 && (
+                      <div className="flex items-center gap-1">
+                        <span className="inline-block w-2 h-2 rounded-full bg-blue-400" />
+                        <span className="text-gray-500">Unpaid</span>
+                        <span className="font-medium text-blue-700">{formatCurrency(parseFloat(client.billedUnpaidTotal!))}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {client.notes && (
+                  <p className="text-xs text-gray-400 mt-2 truncate border-t border-gray-100 pt-2">{client.notes}</p>
+                )}
+              </div>
+            ))}
+          </div>
 
           {inactiveClients.length > 0 && (
-            <details className="border-t border-gray-200">
-              <summary className="px-4 py-3 text-sm text-gray-500 cursor-pointer hover:bg-gray-50">
+            <details className="mt-6">
+              <summary className="text-sm text-gray-500 cursor-pointer hover:text-gray-700">
                 {inactiveClients.length} inactive client{inactiveClients.length > 1 ? 's' : ''}
               </summary>
-              <table className="w-full text-sm">
-                <tbody>
-                  {inactiveClients.map((client) => (
-                    <tr key={client.id} className="border-b border-gray-100 bg-gray-50/50 opacity-60">
-                      <td className="px-4 py-3">{client.name}</td>
-                      <td className="px-4 py-3">{getHolderName(client)}</td>
-                      <td className="px-4 py-3">{client.notes || '-'}</td>
-                      <td className="px-4 py-3 text-right">
-                        <Button variant="ghost" size="sm" onClick={() => handleReactivate(client)}>
-                          Reactivate
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-3">
+                {inactiveClients.map((client) => (
+                  <div
+                    key={client.id}
+                    className="bg-white rounded-lg border border-gray-200 p-4 opacity-60 flex items-center justify-between"
+                  >
+                    <div>
+                      <h3 className="font-medium text-gray-700 text-sm">{client.name}</h3>
+                      <p className="text-xs text-gray-400">{getHolderName(client)}</p>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => handleReactivate(client)}>
+                      Reactivate
+                    </Button>
+                  </div>
+                ))}
+              </div>
             </details>
           )}
-        </div>
+        </>
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -334,6 +378,50 @@ export default function ClientsPage() {
                 placeholder="Leave blank to use base rate from settings"
               />
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="billingCycle">Auto-Invoice Billing Cycle</Label>
+                <Select value={formBillingCycle || '__none__'} onValueChange={(v) => {
+                  setFormBillingCycle(v === '__none__' ? '' : v);
+                  if (v === '__none__') setFormBillingDay('');
+                  else if (!formBillingDay) setFormBillingDay('1');
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="No auto-invoicing" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">None (Manual)</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="bi-weekly">Bi-Weekly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                    <SelectItem value="quarterly">Quarterly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {formBillingCycle && (
+                <div className="space-y-2">
+                  <Label htmlFor="billingDay">
+                    {formBillingCycle === 'weekly' || formBillingCycle === 'bi-weekly'
+                      ? 'Day of Week (1=Mon...7=Sun)'
+                      : 'Day of Month (1-28)'}
+                  </Label>
+                  <Input
+                    id="billingDay"
+                    type="number"
+                    min="1"
+                    max={formBillingCycle === 'weekly' || formBillingCycle === 'bi-weekly' ? 7 : 28}
+                    value={formBillingDay}
+                    onChange={(e) => setFormBillingDay(e.target.value)}
+                    placeholder="1"
+                  />
+                </div>
+              )}
+            </div>
+            {formBillingCycle && (
+              <p className="text-xs text-gray-500 -mt-2">
+                Invoices will be auto-generated as drafts on the scheduled day.
+              </p>
+            )}
             <div className="space-y-2">
               <Label htmlFor="payableTo">Invoice &quot;Payable To&quot; Override</Label>
               <textarea
