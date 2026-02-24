@@ -43,15 +43,15 @@ export default function SettingsPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
           <Settings className="w-6 h-6" />
           Settings
         </h1>
-        <p className="text-gray-500 mt-1">Manage general settings, users, job types, and rate tiers</p>
+        <p className="text-gray-500 dark:text-gray-400 mt-1">Manage general settings, users, job types, and rate tiers</p>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 border-b border-gray-200">
+      <div className="flex gap-1 mb-4 border-b border-gray-200 dark:border-gray-700">
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -59,7 +59,7 @@ export default function SettingsPage() {
             className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
               tab === t.key
                 ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
           >
             <t.icon className="w-4 h-4" />
@@ -126,13 +126,13 @@ function GeneralTab() {
   }
 
   if (loading) {
-    return <div className="p-8 text-center text-gray-500">Loading...</div>;
+    return <div className="p-8 text-center text-gray-500 dark:text-gray-400">Loading...</div>;
   }
 
   return (
     <div className="space-y-6 max-w-lg">
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Company</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Company</h2>
         <div className="space-y-4">
           <div className="space-y-1">
             <label className="text-sm font-medium">Company Name</label>
@@ -141,28 +141,28 @@ function GeneralTab() {
               onChange={(e) => setCompanyName(e.target.value)}
               placeholder="Lost Coast IT"
             />
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               Shown at the top of generated invoices.
             </p>
           </div>
           <div className="space-y-1">
             <label className="text-sm font-medium">Invoice &quot;Payable To&quot;</label>
             <textarea
-              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="flex w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 dark:text-gray-100 px-3 py-2 text-sm placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               rows={3}
               value={payableTo}
               onChange={(e) => setPayableTo(e.target.value)}
               placeholder={"Name\nAddress line 1\nCity, State ZIP"}
             />
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               Displayed in the &quot;Payable To&quot; footer of invoices. Use separate lines for name and address.
             </p>
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Rates</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Rates</h2>
         <div className="space-y-4">
           <div className="space-y-1">
             <label className="text-sm font-medium">Base Hourly Rate ($)</label>
@@ -174,15 +174,15 @@ function GeneralTab() {
               onChange={(e) => setBaseRate(e.target.value)}
               placeholder="185.00"
             />
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               Default rate used when a client does not have a specific hourly rate set.
             </p>
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Auto-Invoicing</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Auto-Invoicing</h2>
         <div className="space-y-4">
           <div className="space-y-1">
             <label className="text-sm font-medium">Minimum Hours Threshold</label>
@@ -194,7 +194,7 @@ function GeneralTab() {
               onChange={(e) => setAutoInvoiceMinHours(e.target.value)}
               placeholder="0.5"
             />
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               Skip auto-generation if a client has fewer unbilled hours than this threshold.
               Set to 0 to always generate.
             </p>
@@ -325,13 +325,13 @@ function UsersTab() {
         </Button>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-gray-500">Loading...</div>
+          <div className="p-8 text-center text-gray-500 dark:text-gray-400">Loading...</div>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
+              <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Username</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Display Name</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
@@ -339,11 +339,11 @@ function UsersTab() {
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {userList.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-3 font-medium text-gray-900">{user.username}</td>
-                  <td className="px-6 py-3 text-gray-600">{user.displayName}</td>
+                <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                  <td className="px-6 py-3 font-medium text-gray-900 dark:text-gray-100">{user.username}</td>
+                  <td className="px-6 py-3 text-gray-600 dark:text-gray-400">{user.displayName}</td>
                   <td className="px-6 py-3">
                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                       user.role === 'partner' ? 'bg-amber-100 text-amber-700' :
@@ -416,7 +416,7 @@ function UsersTab() {
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value as 'partner' | 'admin' | 'basic')}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm bg-white h-10"
+                className="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 h-10"
               >
                 <option value="basic">Basic</option>
                 <option value="admin">Admin</option>
@@ -530,24 +530,24 @@ function JobTypesTab() {
         </Button>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-gray-500">Loading...</div>
+          <div className="p-8 text-center text-gray-500 dark:text-gray-400">Loading...</div>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
+              <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {items.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-3 font-medium text-gray-900">{item.name}</td>
-                  <td className="px-6 py-3 text-gray-600">{item.description || '-'}</td>
+                <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                  <td className="px-6 py-3 font-medium text-gray-900 dark:text-gray-100">{item.name}</td>
+                  <td className="px-6 py-3 text-gray-600 dark:text-gray-400">{item.description || '-'}</td>
                   <td className="px-6 py-3 text-center">
                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                       item.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
@@ -677,24 +677,24 @@ function RateTiersTab() {
         </Button>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-gray-500">Loading...</div>
+          <div className="p-8 text-center text-gray-500 dark:text-gray-400">Loading...</div>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
+              <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rate</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Label</th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {items.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-3 font-medium text-gray-900">{formatCurrency(item.amount)}/h</td>
-                  <td className="px-6 py-3 text-gray-600">{item.label || '-'}</td>
+                <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                  <td className="px-6 py-3 font-medium text-gray-900 dark:text-gray-100">{formatCurrency(item.amount)}/h</td>
+                  <td className="px-6 py-3 text-gray-600 dark:text-gray-400">{item.label || '-'}</td>
                   <td className="px-6 py-3 text-center">
                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                       item.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
@@ -860,7 +860,7 @@ function DatabaseTab() {
   }
 
   if (loading) {
-    return <div className="p-8 text-center text-gray-500">Loading...</div>;
+    return <div className="p-8 text-center text-gray-500 dark:text-gray-400">Loading...</div>;
   }
 
   return (
@@ -875,8 +875,8 @@ function DatabaseTab() {
       )}
 
       {/* Database Info */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
           <HardDrive className="w-5 h-5" />
           Database Info
         </h2>
@@ -887,15 +887,15 @@ function DatabaseTab() {
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">Size</span>
-            <span className="text-gray-900">{dbSize} MB</span>
+            <span className="text-gray-900 dark:text-gray-100">{dbSize} MB</span>
           </div>
         </div>
       </div>
 
       {/* Backups */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
             <Download className="w-5 h-5" />
             Backups
           </h2>
@@ -909,13 +909,13 @@ function DatabaseTab() {
         </div>
 
         {backups.length === 0 ? (
-          <p className="text-sm text-gray-500 text-center py-4">No backups yet. Create one to save a snapshot of your database.</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">No backups yet. Create one to save a snapshot of your database.</p>
         ) : (
           <div className="space-y-2">
             {backups.map((backup) => (
-              <div key={backup.name} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-md">
+              <div key={backup.name} className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-700 rounded-md">
                 <div className="text-sm">
-                  <div className="font-medium text-gray-900">{backup.name}</div>
+                  <div className="font-medium text-gray-900 dark:text-gray-100">{backup.name}</div>
                   <div className="text-gray-500 text-xs">
                     {formatBackupDate(backup.createdAt)} &middot; {backup.sizeMB} MB
                   </div>
@@ -954,12 +954,12 @@ function DatabaseTab() {
       </div>
 
       {/* Danger Zone */}
-      <div className="bg-white rounded-lg border-2 border-red-200 shadow-sm p-6">
-        <h2 className="text-lg font-semibold text-red-700 mb-2 flex items-center gap-2">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-red-200 dark:border-red-900/50 shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-red-700 dark:text-red-400 mb-2 flex items-center gap-2">
           <AlertTriangle className="w-5 h-5" />
           Danger Zone
         </h2>
-        <p className="text-sm text-gray-600 mb-4">
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
           Permanently delete the local database. All data will be lost unless you have a backup or Supabase sync enabled.
         </p>
         <Button
@@ -976,11 +976,11 @@ function DatabaseTab() {
           <DialogHeader>
             <DialogTitle>Restore Database from Backup</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
             This will replace your current database with the backup <span className="font-medium">{restoreTarget}</span>.
             Any changes made since this backup was created will be lost.
           </p>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
             The server will need to restart after restoring.
           </p>
           <DialogFooter>
@@ -1006,11 +1006,11 @@ function DatabaseTab() {
             <DialogTitle className="text-red-700">Delete Database</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               This will permanently delete all local data including clients, time entries, invoices, and settings.
               This action cannot be undone.
             </p>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               Type <span className="font-mono font-bold text-red-600">DELETE</span> to confirm:
             </p>
             <Input

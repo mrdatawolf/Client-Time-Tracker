@@ -20,6 +20,7 @@ route.get('/', async (c) => {
       username: true,
       displayName: true,
       role: true,
+      theme: true,
       isActive: true,
       createdAt: true,
     },
@@ -78,6 +79,7 @@ route.get('/:id', async (c) => {
       username: true,
       displayName: true,
       role: true,
+      theme: true,
       isActive: true,
       createdAt: true,
     },
@@ -118,6 +120,7 @@ route.put('/:id', async (c) => {
   if (displayName !== undefined) updateData.displayName = displayName;
   if (role !== undefined) updateData.role = role;
   if (isActive !== undefined) updateData.isActive = isActive;
+  if (body.theme !== undefined) updateData.theme = body.theme;
   if (password) updateData.passwordHash = await hashPassword(password);
 
   const [updated] = await db.update(users)
@@ -130,6 +133,7 @@ route.put('/:id', async (c) => {
     username: updated.username,
     displayName: updated.displayName,
     role: updated.role,
+    theme: updated.theme,
     isActive: updated.isActive,
   });
 });

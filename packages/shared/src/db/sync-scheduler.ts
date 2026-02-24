@@ -16,6 +16,8 @@ const MAX_BACKOFF = 300_000; // 5 minutes
 
 let intervalHandle: ReturnType<typeof setInterval> | null = null;
 let currentInterval = DEFAULT_INTERVAL;
+let activeSyncPromise: Promise<any> | null = null;
+
 let status: SyncStatus = {
   state: 'disabled',
   pendingCount: 0,
@@ -44,8 +46,8 @@ export function startSyncScheduler(intervalMs: number = DEFAULT_INTERVAL): void 
   status.state = 'idle';
   console.log(`[Sync] Starting sync scheduler (interval: ${intervalMs}ms)`);
 
-  // Run first sync immediately
-  runSyncTick();
+  // Run first sync immediately (don't wait for it here)
+  runSyncTick().catch(() => {});
 
   intervalHandle = setInterval(runSyncTick, currentInterval);
 }
@@ -61,11 +63,14 @@ export function stopSyncScheduler(): void {
 }
 
 /** Trigger a manual sync (returns a promise that resolves when sync completes) */
-export async function triggerSync(): Promise<void> {
-  if (status.state === 'syncing') {
-    throw new Error('Sync is already in progress');
+export async function triggerSync(): Promise<any> {
+  // If a sync is already running, return the existing promise
+  if (activeSyncPromise) {
+    console.log('[Sync] Join existing active sync');
+    return activeSyncPromise;
   }
-  await runSyncTick();
+
+  return runSyncTick();
 }
 
 /** Restart the scheduler (e.g., when config changes) */
@@ -74,9 +79,9 @@ export function restartSyncScheduler(): void {
   startSyncScheduler(DEFAULT_INTERVAL);
 }
 
-async function runSyncTick(): Promise<void> {
+async function runSyncTick(): Promise<any> {
   // Skip if already syncing
-  if (status.state === 'syncing') return;
+  if (status.state === 'syncing' && activeSyncPromise) return activeSyncPromise;
 
   // Check if still enabled
   if (!isSupabaseEnabled()) {
@@ -85,57 +90,67 @@ async function runSyncTick(): Promise<void> {
   }
 
   status.state = 'syncing';
+  activeSyncPromise = (async () => {
+    try {
+      // Update pending count before sync
+      status.pendingCount = await getPendingCount();
 
-  try {
-    // Update pending count before sync
-    status.pendingCount = await getPendingCount();
+      const result = await runSyncCycle();
 
-    const result = await runSyncCycle();
+      // Success (possibly with partial errors): reset backoff
+      status.state = result.pushErrors > 0 || result.pullErrors > 0 ? 'error' : 'idle';
+      status.lastError = result.pushErrors > 0 || result.pullErrors > 0 
+        ? `Sync complete with ${result.pushErrors + result.pullErrors} errors.`
+        : null;
+      status.consecutiveFailures = 0;
+      status.pendingCount = await getPendingCount();
 
-    // Success: reset backoff
-    status.state = 'idle';
-    status.lastError = null;
-    status.consecutiveFailures = 0;
-    status.pendingCount = await getPendingCount();
+      if (result.pushed > 0 || result.pulled > 0 || result.pushErrors > 0 || result.pullErrors > 0) {
+        console.log(`[Sync] Cycle complete: pushed=${result.pushed}, pulled=${result.pulled}, errors=${result.pushErrors + result.pullErrors}`);
+      }
 
-    if (result.pushed > 0 || result.pulled > 0) {
-      console.log(`[Sync] Cycle complete: pushed=${result.pushed}, pulled=${result.pulled}`);
+      // Reset interval to default if we had backed off
+      if (currentInterval !== DEFAULT_INTERVAL && intervalHandle) {
+        clearInterval(intervalHandle);
+        currentInterval = DEFAULT_INTERVAL;
+        intervalHandle = setInterval(runSyncTick, currentInterval);
+      }
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+
+      // Determine if this is a network error (offline) vs other error
+      const isNetworkError = message.includes('ECONNREFUSED') ||
+        message.includes('ENOTFOUND') ||
+        message.includes('ETIMEDOUT') ||
+        message.includes('getaddrinfo') ||
+        message.includes('connect ECONNRESET') ||
+        message.includes('Connection terminated unexpectedly');
+
+      status.state = isNetworkError ? 'offline' : 'error';
+      status.lastError = message;
+      status.consecutiveFailures++;
+
+      console.error(`[Sync] Error (attempt ${status.consecutiveFailures}): ${message}`);
+
+      // Exponential backoff
+      const backoffInterval = Math.min(
+        DEFAULT_INTERVAL * Math.pow(2, status.consecutiveFailures),
+        MAX_BACKOFF
+      );
+
+      if (backoffInterval !== currentInterval && intervalHandle) {
+        clearInterval(intervalHandle);
+        currentInterval = backoffInterval;
+        intervalHandle = setInterval(runSyncTick, currentInterval);
+        console.log(`[Sync] Backing off to ${currentInterval}ms interval`);
+      }
+
+      throw error;
+    } finally {
+      activeSyncPromise = null;
     }
+  })();
 
-    // Reset interval to default if we had backed off
-    if (currentInterval !== DEFAULT_INTERVAL && intervalHandle) {
-      clearInterval(intervalHandle);
-      currentInterval = DEFAULT_INTERVAL;
-      intervalHandle = setInterval(runSyncTick, currentInterval);
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-
-    // Determine if this is a network error (offline) vs other error
-    const isNetworkError = message.includes('ECONNREFUSED') ||
-      message.includes('ENOTFOUND') ||
-      message.includes('ETIMEDOUT') ||
-      message.includes('getaddrinfo') ||
-      message.includes('connect ECONNRESET') ||
-      message.includes('Connection terminated unexpectedly');
-
-    status.state = isNetworkError ? 'offline' : 'error';
-    status.lastError = message;
-    status.consecutiveFailures++;
-
-    console.error(`[Sync] Error (attempt ${status.consecutiveFailures}): ${message}`);
-
-    // Exponential backoff
-    const backoffInterval = Math.min(
-      DEFAULT_INTERVAL * Math.pow(2, status.consecutiveFailures),
-      MAX_BACKOFF
-    );
-
-    if (backoffInterval !== currentInterval && intervalHandle) {
-      clearInterval(intervalHandle);
-      currentInterval = backoffInterval;
-      intervalHandle = setInterval(runSyncTick, currentInterval);
-      console.log(`[Sync] Backing off to ${currentInterval}ms interval`);
-    }
-  }
+  return activeSyncPromise;
 }

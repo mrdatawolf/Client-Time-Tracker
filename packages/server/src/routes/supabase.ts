@@ -235,8 +235,12 @@ app.post('/sync', requireAdmin(), async (c) => {
 
   try {
     const { triggerSync } = await import('@ctt/shared/db/sync-scheduler');
-    await triggerSync();
-    return c.json({ success: true, message: 'Sync triggered' });
+    const result = await triggerSync();
+    return c.json({ 
+      success: true, 
+      message: `Sync complete. Pushed: ${result.pushed}, Pulled: ${result.pulled}`,
+      ...result 
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return c.json({ success: false, message: `Sync failed: ${message}` }, 500);
@@ -288,6 +292,7 @@ function getSchemaSQL(): string {
       created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
       updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
     );
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS theme TEXT NOT NULL DEFAULT 'system';
 
     -- Clients
     CREATE TABLE IF NOT EXISTS clients (
@@ -438,6 +443,18 @@ function getSchemaSQL(): string {
       client_id UUID NOT NULL REFERENCES clients(id) UNIQUE,
       content TEXT NOT NULL,
       updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+    );
+
+    -- Auto-invoice log table
+    CREATE TABLE IF NOT EXISTS auto_invoice_log (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      client_id UUID NOT NULL REFERENCES clients(id),
+      invoice_id UUID REFERENCES invoices(id),
+      billing_period_start DATE NOT NULL,
+      billing_period_end DATE NOT NULL,
+      status TEXT NOT NULL,
+      message TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
     );
   `;
 }

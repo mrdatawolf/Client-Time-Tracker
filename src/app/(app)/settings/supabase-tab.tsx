@@ -202,11 +202,11 @@ export default function SupabaseTab() {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6 max-w-2xl text-gray-900 dark:text-gray-100">
       {/* Connection Settings */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-1">Supabase Connection</h2>
-        <p className="text-sm text-gray-500 mb-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">Supabase Connection</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
           Connect to a remote Supabase PostgreSQL database for team collaboration and cloud backup.
         </p>
 
@@ -218,7 +218,7 @@ export default function SupabaseTab() {
               onChange={(e) => setSupabaseUrl(e.target.value)}
               placeholder="https://your-project.supabase.co"
             />
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               Your project URL from the Supabase dashboard.
             </p>
           </div>
@@ -235,10 +235,10 @@ export default function SupabaseTab() {
           </div>
 
           <details className="pt-2">
-            <summary className="text-sm font-medium text-gray-600 cursor-pointer hover:text-gray-900">
+            <summary className="text-sm font-medium text-gray-600 dark:text-gray-400 cursor-pointer hover:text-gray-900 dark:hover:text-gray-200">
               Optional: API Keys (not required for sync)
             </summary>
-            <div className="space-y-4 mt-3 pl-2 border-l-2 border-gray-100">
+            <div className="space-y-4 mt-3 pl-2 border-l-2 border-gray-100 dark:border-gray-700">
               <div className="space-y-1">
                 <label className="text-sm font-medium">Anon / Publishable Key</label>
                 <Input
@@ -257,7 +257,7 @@ export default function SupabaseTab() {
                   onChange={(e) => setServiceKey(e.target.value)}
                   placeholder="eyJ... or sb_secret_..."
                 />
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
                   Found in Supabase Dashboard &gt; Settings &gt; API Keys. Stored for potential future features; not used by the sync engine.
                 </p>
               </div>
@@ -268,11 +268,11 @@ export default function SupabaseTab() {
             <Button onClick={handleSave} disabled={saving || !databaseUrl}>
               {saving ? 'Saving...' : 'Save Connection'}
             </Button>
-            {saved && <span className="text-sm text-green-600">Saved</span>}
+            {saved && <span className="text-sm text-green-600 dark:text-green-400">Saved</span>}
           </div>
 
           {/* Export / Import */}
-          <div className="pt-4 border-t border-gray-100 space-y-3">
+          <div className="pt-4 border-t border-gray-100 dark:border-gray-700 space-y-3">
             <div className="flex items-center gap-3">
               <Button
                 variant="outline"
@@ -282,7 +282,7 @@ export default function SupabaseTab() {
               >
                 {exporting ? 'Exporting...' : exportCopied ? 'Copied!' : 'Export Config'}
               </Button>
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-gray-500 dark:text-gray-400">
                 Copy an encrypted config string to share with another installation
               </span>
             </div>
@@ -304,16 +304,16 @@ export default function SupabaseTab() {
                   {importing ? 'Importing...' : 'Import'}
                 </Button>
               </div>
-              {importError && <p className="text-xs text-red-600">{importError}</p>}
-              {importSuccess && <p className="text-xs text-green-600">Imported! Review the fields above, then click Save Connection.</p>}
+              {importError && <p className="text-xs text-red-600 dark:text-red-400">{importError}</p>}
+              {importSuccess && <p className="text-xs text-green-600 dark:text-green-400">Imported! Review the fields above, then click Save Connection.</p>}
             </div>
           </div>
         </div>
       </div>
 
       {/* Actions */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Setup & Actions</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Setup & Actions</h2>
 
         <div className="space-y-4">
           {/* Test Connection */}
@@ -326,7 +326,7 @@ export default function SupabaseTab() {
               {testing ? 'Testing...' : 'Test Connection'}
             </Button>
             {testResult && (
-              <div className={`flex items-center gap-1.5 text-sm ${testResult.success ? 'text-green-600' : 'text-red-600'}`}>
+              <div className={`flex items-center gap-1.5 text-sm ${testResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                 {testResult.success ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
                 {testResult.message}
               </div>
@@ -344,7 +344,7 @@ export default function SupabaseTab() {
               {settingUpSchema ? 'Setting up...' : 'Setup Schema on Supabase'}
             </Button>
             {schemaResult && (
-              <div className={`flex items-center gap-1.5 text-sm ${schemaResult.success ? 'text-green-600' : 'text-red-600'}`}>
+              <div className={`flex items-center gap-1.5 text-sm ${schemaResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                 {schemaResult.success ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
                 {schemaResult.message}
               </div>
@@ -352,7 +352,7 @@ export default function SupabaseTab() {
           </div>
 
           {/* Enable / Disable */}
-          <div className="flex items-center gap-3 pt-2 border-t border-gray-100">
+          <div className="flex items-center gap-3 pt-2 border-t border-gray-100 dark:border-gray-700">
             <Button
               variant={config?.enabled ? 'destructive' : 'default'}
               onClick={handleToggleEnabled}
@@ -360,13 +360,13 @@ export default function SupabaseTab() {
             >
               {config?.enabled ? 'Disable Sync' : 'Enable Sync'}
             </Button>
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-gray-500 dark:text-gray-400">
               {config?.enabled ? 'Sync is active' : 'Sync is currently disabled'}
             </span>
           </div>
 
           {/* Initial Sync */}
-          <div className="flex items-center gap-3 pt-2 border-t border-gray-100">
+          <div className="flex items-center gap-3 pt-2 border-t border-gray-100 dark:border-gray-700">
             <Button
               variant="outline"
               onClick={() => setInitialSyncOpen(true)}
@@ -374,7 +374,7 @@ export default function SupabaseTab() {
             >
               Initial Sync
             </Button>
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-gray-500 dark:text-gray-400">
               Run a one-time full sync when connecting for the first time
             </span>
           </div>
@@ -383,9 +383,9 @@ export default function SupabaseTab() {
 
       {/* Sync Status */}
       {config?.enabled && (
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Sync Status</h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Sync Status</h2>
             <Button
               variant="outline"
               size="sm"
@@ -399,28 +399,28 @@ export default function SupabaseTab() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <div className="text-xs font-medium text-gray-500 uppercase mb-1">State</div>
+              <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">State</div>
               <div className="flex items-center gap-1.5">
                 <SyncStateIndicator state={status?.state || 'disabled'} />
               </div>
             </div>
             <div>
-              <div className="text-xs font-medium text-gray-500 uppercase mb-1">Pending Changes</div>
-              <div className="text-sm font-medium">
+              <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Pending Changes</div>
+              <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
                 {status?.pendingCount ?? 0}
               </div>
             </div>
             <div>
-              <div className="text-xs font-medium text-gray-500 uppercase mb-1">Last Sync</div>
-              <div className="text-sm text-gray-700">
+              <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Last Sync</div>
+              <div className="text-sm text-gray-700 dark:text-gray-300">
                 {status?.lastSyncAt
                   ? new Date(status.lastSyncAt).toLocaleString()
                   : 'Never'}
               </div>
             </div>
             <div>
-              <div className="text-xs font-medium text-gray-500 uppercase mb-1">Instance ID</div>
-              <div className="text-xs text-gray-500 font-mono truncate" title={status?.instanceId}>
+              <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Instance ID</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate" title={status?.instanceId}>
                 {status?.instanceId?.slice(0, 8) || '-'}
               </div>
             </div>
@@ -435,11 +435,11 @@ export default function SupabaseTab() {
             <DialogTitle>Initial Sync</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               Choose how to handle the first-time sync between your local database and Supabase.
             </p>
             <div className="space-y-2">
-              <label className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+              <label className="flex items-start gap-3 p-3 border border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50">
                 <input
                   type="radio"
                   name="direction"
@@ -449,11 +449,11 @@ export default function SupabaseTab() {
                   className="mt-0.5"
                 />
                 <div>
-                  <div className="font-medium text-sm">Push Local to Remote</div>
-                  <div className="text-xs text-gray-500">Upload all your local data to the empty Supabase database</div>
+                  <div className="font-medium text-sm text-gray-900 dark:text-gray-100">Push Local to Remote</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Upload all your local data to the empty Supabase database</div>
                 </div>
               </label>
-              <label className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+              <label className="flex items-start gap-3 p-3 border border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50">
                 <input
                   type="radio"
                   name="direction"
@@ -463,11 +463,11 @@ export default function SupabaseTab() {
                   className="mt-0.5"
                 />
                 <div>
-                  <div className="font-medium text-sm">Pull Remote to Local</div>
-                  <div className="text-xs text-gray-500">Download all data from Supabase into your local database (new team member)</div>
+                  <div className="font-medium text-sm text-gray-900 dark:text-gray-100">Pull Remote to Local</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Download all data from Supabase into your local database (new team member)</div>
                 </div>
               </label>
-              <label className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+              <label className="flex items-start gap-3 p-3 border border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50">
                 <input
                   type="radio"
                   name="direction"
@@ -477,14 +477,14 @@ export default function SupabaseTab() {
                   className="mt-0.5"
                 />
                 <div>
-                  <div className="font-medium text-sm">Merge Both</div>
-                  <div className="text-xs text-gray-500">Merge local and remote data using timestamps (most recent wins)</div>
+                  <div className="font-medium text-sm text-gray-900 dark:text-gray-100">Merge Both</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Merge local and remote data using timestamps (most recent wins)</div>
                 </div>
               </label>
             </div>
 
             {initialSyncResult && (
-              <div className="p-3 rounded-lg bg-blue-50 text-sm text-blue-800">
+              <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-sm text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                 {initialSyncResult}
               </div>
             )}
@@ -522,13 +522,13 @@ function ConnectionHint({ supabaseUrl }: { supabaseUrl: string }) {
   if (ref) {
     const connectUrl = `https://supabase.com/dashboard/project/${ref}/integrations/data_api/overview?showConnect=true&method=session`;
     return (
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-gray-500 dark:text-gray-400">
         Use the <strong>Session pooler</strong> connection string (not Direct).{' '}
         <a
           href={connectUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-blue-600 hover:underline"
+          className="text-blue-600 dark:text-blue-400 hover:underline"
         >
           Open connection settings for your project
         </a>
@@ -537,7 +537,7 @@ function ConnectionHint({ supabaseUrl }: { supabaseUrl: string }) {
   }
 
   return (
-    <p className="text-xs text-gray-500">
+    <p className="text-xs text-gray-500 dark:text-gray-400">
       Enter your Supabase Project URL above to get a direct link to your connection settings.
       Use the <strong>Session pooler</strong> connection string (not Direct).
     </p>
@@ -548,31 +548,31 @@ function SyncStateIndicator({ state }: { state: string }) {
   switch (state) {
     case 'idle':
       return (
-        <span className="flex items-center gap-1.5 text-sm text-green-600">
+        <span className="flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400">
           <Wifi className="w-4 h-4" /> Connected
         </span>
       );
     case 'syncing':
       return (
-        <span className="flex items-center gap-1.5 text-sm text-blue-600">
+        <span className="flex items-center gap-1.5 text-sm text-blue-600 dark:text-blue-400">
           <RefreshCw className="w-4 h-4 animate-spin" /> Syncing...
         </span>
       );
     case 'offline':
       return (
-        <span className="flex items-center gap-1.5 text-sm text-orange-600">
+        <span className="flex items-center gap-1.5 text-sm text-orange-600 dark:text-orange-400">
           <WifiOff className="w-4 h-4" /> Offline
         </span>
       );
     case 'error':
       return (
-        <span className="flex items-center gap-1.5 text-sm text-red-600">
+        <span className="flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400">
           <AlertCircle className="w-4 h-4" /> Error
         </span>
       );
     default:
       return (
-        <span className="flex items-center gap-1.5 text-sm text-gray-500">
+        <span className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
           Disabled
         </span>
       );

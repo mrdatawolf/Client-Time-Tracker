@@ -53,11 +53,11 @@ export function clearToken() {
   localStorage.removeItem('ctt_user');
 }
 
-export function setUser(user: { id: string; username: string; displayName: string; role: string }) {
+export function setUser(user: { id: string; username: string; displayName: string; role: string; theme?: string }) {
   localStorage.setItem('ctt_user', JSON.stringify(user));
 }
 
-export function getUser(): { id: string; username: string; displayName: string; role: string } | null {
+export function getUser(): { id: string; username: string; displayName: string; role: string; theme?: string } | null {
   if (typeof window === 'undefined') return null;
   const stored = localStorage.getItem('ctt_user');
   if (!stored) return null;

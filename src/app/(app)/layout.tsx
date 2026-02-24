@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/Sidebar';
 import { SyncOverlay } from '@/components/SyncOverlay';
-import { Toaster } from 'sonner';
+import { Toaster, toast } from 'sonner';
 import { isAuthenticated } from '@/lib/api-client';
 import { supabaseSync } from '@/lib/api';
 
@@ -34,7 +34,12 @@ export default function AppLayout({
 
       // Race sync against timeout
       await Promise.race([
-        supabaseSync.sync().catch(() => {}),
+        supabaseSync.sync().catch((err) => {
+          const errorMessage = (err as any)?.body?.error || (err as Error).message || 'An unknown error occurred.';
+          toast.error('Sync failed', {
+            description: errorMessage,
+          });
+        }),
         new Promise((resolve) => setTimeout(resolve, SYNC_TIMEOUT)),
       ]);
     } catch {
@@ -73,7 +78,10 @@ export default function AppLayout({
         const status = await supabaseSync.getStatus();
         if (status.enabled && status.state !== 'disabled') {
           await Promise.race([
-            supabaseSync.sync().catch(() => {}),
+            supabaseSync.sync().catch((err) => {
+              // Don't show toast on close, just log for debugging
+              console.error('Sync on close failed:', err);
+            }),
             new Promise((resolve) => setTimeout(resolve, SYNC_TIMEOUT)),
           ]);
         }
@@ -98,7 +106,7 @@ export default function AppLayout({
       <Toaster position="top-right" richColors />
       <SyncOverlay visible={syncing} message={syncMessage} />
       <Sidebar />
-      <main className="flex-1 overflow-auto bg-gray-50 p-6">
+      <main className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-900 p-6">
         {children}
       </main>
     </div>

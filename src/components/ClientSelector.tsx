@@ -41,7 +41,7 @@ export default function ClientSelector({ value, onChange, className, allowAll }:
           </SelectItem>
         ))}
         {clientList.length === 0 && !allowAll && (
-          <div className="px-2 py-4 text-sm text-gray-500 text-center">
+          <div className="px-2 py-4 text-sm text-gray-500 dark:text-gray-400 text-center">
             No clients. Add one first.
           </div>
         )}

@@ -40,6 +40,7 @@ route.post('/login', async (c) => {
       username: user.username,
       displayName: user.displayName,
       role: user.role,
+      theme: user.theme,
       isActive: user.isActive,
     },
   });
@@ -63,7 +64,37 @@ route.get('/me', requireAuth(), async (c) => {
     username: user.username,
     displayName: user.displayName,
     role: user.role,
+    theme: user.theme,
     isActive: user.isActive,
+  });
+});
+
+// POST /preferences - Update own preferences (theme, etc.)
+route.post('/preferences', requireAuth(), async (c) => {
+  const userId = getUserId(c);
+  const body = await c.req.json();
+  const { theme } = body;
+
+  if (theme && !['light', 'dark', 'system'].includes(theme)) {
+    return c.json({ error: 'Invalid theme. Must be light, dark, or system.' }, 400);
+  }
+
+  const db = await getDb();
+  const updateData: Record<string, unknown> = { updatedAt: new Date() };
+  if (theme) updateData.theme = theme;
+
+  const [updated] = await db.update(users)
+    .set(updateData)
+    .where(eq(users.id, userId))
+    .returning();
+
+  return c.json({
+    id: updated.id,
+    username: updated.username,
+    displayName: updated.displayName,
+    role: updated.role,
+    theme: updated.theme,
+    isActive: updated.isActive,
   });
 });
 
@@ -148,6 +179,7 @@ route.post('/setup', async (c) => {
       username: newUser.username,
       displayName: newUser.displayName,
       role: newUser.role,
+      theme: newUser.theme,
       isActive: newUser.isActive,
     },
   });

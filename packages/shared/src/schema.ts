@@ -13,6 +13,7 @@ export const users = pgTable('users', {
   displayName: text('display_name').notNull(),
   passwordHash: text('password_hash').notNull(),
   role: userRoleEnum('role').notNull().default('basic'),
+  theme: text('theme').notNull().default('system'),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
