@@ -83,7 +83,18 @@ On first launch, the application will guide you through creating an admin accoun
 -   To seed the database with initial data, run: `pnpm db:seed`.
 -   Drizzle Studio can be used to browse the database, but is not yet configured in the project.
 
-## 4. Building and Distribution
+## 4. Reporting Features
+
+The application includes a suite of financial and operational reports designed for partner-based consulting:
+
+-   **Partner Settlement:** Calculates exact partner earnings based on the 73/27 split logic (Tech Share vs. Account Holder Share) from paid time entries.
+-   **Aged Receivables (A/R):** Categorizes unpaid balances into 30-day buckets (Current, 31-60, 61-90, 90+ days) to track late payments.
+-   **Work-in-Progress (WIP):** Identifies logged time entries that have not yet been billed, highlighting unbilled revenue and "stale" entries older than 30 days.
+-   **Profitability (Effective Rate):** Calculates the true hourly earnings per client by dividing total revenue by total hours spent.
+-   **Tech Utilization & Yield:** Analyzes technician performance (billable vs. total hours) and calculates the specific revenue yield for the partnership.
+-   **Balance Report:** Provides a client-specific view of all outstanding items (unbilled and unpaid), allowing for quick payment recording.
+
+## 5. Building and Distribution
 
 The project can be packaged as a standalone server or an Electron desktop app.
 

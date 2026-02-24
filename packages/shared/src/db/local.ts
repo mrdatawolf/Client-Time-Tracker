@@ -189,7 +189,7 @@ async function initializeSchema(client: PGlite): Promise<void> {
     CREATE TABLE IF NOT EXISTS invoice_line_items (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       invoice_id UUID NOT NULL REFERENCES invoices(id),
-      time_entry_id UUID REFERENCES time_entries(id),
+      time_entry_id UUID REFERENCES time_entries(id) ON DELETE SET NULL,
       description TEXT NOT NULL,
       hours NUMERIC(6, 2) NOT NULL,
       rate NUMERIC(10, 2) NOT NULL,
@@ -298,6 +298,14 @@ async function initializeSchema(client: PGlite): Promise<void> {
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS billing_day NUMERIC(2, 0);
 
     ALTER TABLE invoices ADD COLUMN IF NOT EXISTS is_auto_generated BOOLEAN NOT NULL DEFAULT false;
+
+    -- Fix invoice_line_items foreign key to allow deleting time entries
+    DO $$ BEGIN
+      ALTER TABLE invoice_line_items DROP CONSTRAINT IF EXISTS invoice_line_items_time_entry_id_fkey;
+      ALTER TABLE invoice_line_items ADD CONSTRAINT invoice_line_items_time_entry_id_fkey 
+        FOREIGN KEY (time_entry_id) REFERENCES time_entries(id) ON DELETE SET NULL;
+    EXCEPTION WHEN others THEN NULL;
+    END $$;
   `);
 
   // 4. Triggers and Functions

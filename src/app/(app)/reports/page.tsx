@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { BarChart3, Download, Users, Briefcase, List, DollarSign, Pencil, Check } from 'lucide-react';
+import { BarChart3, Download, Users, Briefcase, List, DollarSign, Pencil, Check, Clock, Timer, TrendingUp, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -20,11 +20,16 @@ import {
   type DateRangeEntry,
   type BalanceEntry,
   type Client,
+  type PartnerSettlementReport,
+  type AgedReceivablesReport,
+  type WipReport,
+  type EffectiveRateReport,
+  type TechUtilizationReport,
 } from '@/lib/api';
 import { formatCurrency, formatDate, toISODate } from '@/lib/utils';
 import { isAdmin } from '@/lib/api-client';
 
-type Tab = 'client' | 'tech' | 'entries' | 'balance';
+type Tab = 'client' | 'tech' | 'entries' | 'balance' | 'settlement' | 'aged' | 'wip' | 'profitability' | 'utilization';
 
 export default function ReportsPage() {
   const admin = isAdmin();
@@ -35,6 +40,11 @@ export default function ReportsPage() {
   const [clientList, setClientList] = useState<Client[]>([]);
   const [clientSummary, setClientSummary] = useState<ClientSummary[]>([]);
   const [techSummary, setTechSummary] = useState<TechSummary[]>([]);
+  const [settlementData, setSettlementData] = useState<PartnerSettlementReport[]>([]);
+  const [agedData, setAgedData] = useState<AgedReceivablesReport | null>(null);
+  const [wipData, setWipData] = useState<WipReport | null>(null);
+  const [profitabilityData, setProfitabilityData] = useState<EffectiveRateReport[]>([]);
+  const [utilizationData, setUtilizationData] = useState<TechUtilizationReport[]>([]);
   const [entries, setEntries] = useState<DateRangeEntry[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -83,6 +93,16 @@ export default function ReportsPage() {
         setClientSummary(await reportsApi.clientSummary(filters));
       } else if (tab === 'tech') {
         setTechSummary(await reportsApi.techSummary(filters));
+      } else if (tab === 'settlement') {
+        setSettlementData(await reportsApi.partnerSettlement(filters));
+      } else if (tab === 'aged') {
+        setAgedData(await reportsApi.agedReceivables());
+      } else if (tab === 'wip') {
+        setWipData(await reportsApi.wip());
+      } else if (tab === 'profitability') {
+        setProfitabilityData(await reportsApi.effectiveRate(filters));
+      } else if (tab === 'utilization') {
+        setUtilizationData(await reportsApi.techUtilization(filters));
       } else {
         setEntries(await reportsApi.dateRange({ ...filters, clientId: clientFilter || undefined }));
       }
@@ -189,6 +209,11 @@ export default function ReportsPage() {
   const tabs: { key: Tab; label: string; icon: typeof BarChart3; adminOnly?: boolean }[] = [
     { key: 'client', label: 'By Client', icon: Briefcase, adminOnly: true },
     { key: 'tech', label: 'By Tech', icon: Users, adminOnly: true },
+    { key: 'settlement', label: 'Settlement', icon: DollarSign, adminOnly: true },
+    { key: 'aged', label: 'Aged A/R', icon: Clock, adminOnly: true },
+    { key: 'wip', label: 'WIP', icon: Timer, adminOnly: true },
+    { key: 'profitability', label: 'Profitability', icon: TrendingUp, adminOnly: true },
+    { key: 'utilization', label: 'Utilization', icon: UserCheck, adminOnly: true },
     { key: 'entries', label: 'Entries', icon: List },
     { key: 'balance', label: 'Balance', icon: DollarSign, adminOnly: true },
   ];
@@ -414,6 +439,275 @@ export default function ReportsPage() {
                   </td>
                 </tr>
               </tfoot>
+            </table>
+          )}
+        </div>
+      ) : tab === 'settlement' ? (
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+          {settlementData.length === 0 ? (
+            <div className="p-6 text-center text-gray-500 dark:text-gray-400">No data for this period</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Partner</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">As Tech</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">As Holder</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total Earned</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total Paid</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Balance Owed</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                {settlementData.map((row) => (
+                  <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-6 py-3 font-medium text-gray-900 dark:text-gray-100">{row.name}</td>
+                    <td className="px-6 py-3 text-right text-gray-600 dark:text-gray-400">{formatCurrency(row.earnedAsTech)}</td>
+                    <td className="px-6 py-3 text-right text-gray-600 dark:text-gray-400">{formatCurrency(row.earnedAsHolder)}</td>
+                    <td className="px-6 py-3 text-right font-medium text-gray-900 dark:text-gray-100">{formatCurrency(row.totalEarned)}</td>
+                    <td className="px-6 py-3 text-right text-gray-600 dark:text-gray-400">{formatCurrency(row.totalPaid)}</td>
+                    <td className="px-6 py-3 text-right">
+                      <span className={`font-bold ${parseFloat(row.balance) > 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                        {formatCurrency(row.balance)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      ) : tab === 'aged' ? (
+        <div className="space-y-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+              <h3 className="font-semibold text-gray-900 dark:text-gray-100">Summary by Client</h3>
+            </div>
+            {!agedData || agedData.summary.length === 0 ? (
+              <div className="p-6 text-center text-gray-500 dark:text-gray-400">No outstanding invoices</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Client</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Current</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">31-60 Days</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">61-90 Days</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">90+ Days</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                  {agedData.summary.map((row) => (
+                    <tr key={row.name} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-6 py-3 font-medium text-gray-900 dark:text-gray-100">{row.name}</td>
+                      <td className="px-6 py-3 text-right text-gray-600 dark:text-gray-400">{formatCurrency(row.current)}</td>
+                      <td className="px-6 py-3 text-right text-gray-600 dark:text-gray-400">{formatCurrency(row.thirtyToSixty)}</td>
+                      <td className="px-6 py-3 text-right text-gray-600 dark:text-gray-400">{formatCurrency(row.sixtyToNinety)}</td>
+                      <td className="px-6 py-3 text-right text-gray-600 dark:text-gray-400">{formatCurrency(row.ninetyPlus)}</td>
+                      <td className="px-6 py-3 text-right font-bold text-gray-900 dark:text-gray-100">{formatCurrency(row.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+              <h3 className="font-semibold text-gray-900 dark:text-gray-100">Detailed Invoices</h3>
+            </div>
+            {!agedData || agedData.invoices.length === 0 ? (
+              <div className="p-6 text-center text-gray-500 dark:text-gray-400">No outstanding invoices</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Invoice #</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Issued</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Client</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Age</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Balance</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                  {agedData.invoices.map((inv) => (
+                    <tr key={inv.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-6 py-3 font-medium text-blue-600 dark:text-blue-400">#{inv.invoiceNumber}</td>
+                      <td className="px-6 py-3 text-gray-600 dark:text-gray-400">{formatDate(inv.dateIssued)}</td>
+                      <td className="px-6 py-3 text-gray-900 dark:text-gray-100">{inv.clientName}</td>
+                      <td className="px-6 py-3 text-right">
+                        <span className={`px-2 py-0.5 rounded text-xs ${
+                          inv.daysOld > 60 ? 'bg-red-100 text-red-700' :
+                          inv.daysOld > 30 ? 'bg-amber-100 text-amber-700' :
+                          'bg-green-100 text-green-700'
+                        }`}>
+                          {inv.daysOld} days
+                        </span>
+                      </td>
+                      <td className="px-6 py-3 text-right font-semibold text-gray-900 dark:text-gray-100">{formatCurrency(inv.balance)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      ) : tab === 'wip' ? (
+        <div className="space-y-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+              <h3 className="font-semibold text-gray-900 dark:text-gray-100">Client WIP Summary</h3>
+            </div>
+            {!wipData || wipData.summary.length === 0 ? (
+              <div className="p-6 text-center text-gray-500 dark:text-gray-400">No unbilled time entries</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Client</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Oldest Entry</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total Hours</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total Revenue</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Stale (30d+)</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Stale Revenue</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                  {wipData.summary.map((row) => (
+                    <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-6 py-3 font-medium text-gray-900 dark:text-gray-100">{row.name}</td>
+                      <td className="px-6 py-3 text-right text-gray-600 dark:text-gray-400">{formatDate(row.oldestEntryDate)}</td>
+                      <td className="px-6 py-3 text-right text-gray-600 dark:text-gray-400">{row.totalHours}h</td>
+                      <td className="px-6 py-3 text-right font-medium text-gray-900 dark:text-gray-100">{formatCurrency(row.totalRevenue)}</td>
+                      <td className="px-6 py-3 text-right">
+                        <span className={parseFloat(row.staleHours) > 0 ? 'text-amber-600 font-medium' : 'text-gray-400'}>
+                          {row.staleHours}h
+                        </span>
+                      </td>
+                      <td className="px-6 py-3 text-right">
+                        <span className={parseFloat(row.staleRevenue) > 0 ? 'text-amber-600 font-bold' : 'text-gray-400'}>
+                          {formatCurrency(row.staleRevenue)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+              <h3 className="font-semibold text-gray-900 dark:text-gray-100">Unbilled Entries</h3>
+            </div>
+            {!wipData || wipData.entries.length === 0 ? (
+              <div className="p-6 text-center text-gray-500 dark:text-gray-400">No unbilled time entries</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Client</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Tech</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Hours</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Age</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Revenue</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                  {wipData.entries.map((e) => (
+                    <tr key={e.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-6 py-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">{formatDate(e.date)}</td>
+                      <td className="px-6 py-3 text-gray-900 dark:text-gray-100">{e.clientName}</td>
+                      <td className="px-6 py-3 text-gray-600 dark:text-gray-400">{e.techName}</td>
+                      <td className="px-6 py-3 text-right">{parseFloat(e.hours).toFixed(2)}h</td>
+                      <td className="px-6 py-3 text-right">
+                        <span className={`px-2 py-0.5 rounded text-xs ${
+                          e.daysOld > 30 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {e.daysOld} days
+                        </span>
+                      </td>
+                      <td className="px-6 py-3 text-right font-semibold text-gray-900 dark:text-gray-100">{formatCurrency(e.revenue)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      ) : tab === 'profitability' ? (
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+          {profitabilityData.length === 0 ? (
+            <div className="p-6 text-center text-gray-500 dark:text-gray-400">No data for this period</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Client</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total Hours</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total Revenue</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Effective Rate</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                {profitabilityData.map((row) => (
+                  <tr key={row.clientId} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-6 py-3 font-medium text-gray-900 dark:text-gray-100">{row.clientName}</td>
+                    <td className="px-6 py-3 text-right text-gray-600 dark:text-gray-400">{row.totalHours}h</td>
+                    <td className="px-6 py-3 text-right text-gray-600 dark:text-gray-400">{formatCurrency(row.totalRevenue)}</td>
+                    <td className="px-6 py-3 text-right">
+                      <span className="font-bold text-gray-900 dark:text-gray-100">
+                        {formatCurrency(row.effectiveRate)}/h
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      ) : tab === 'utilization' ? (
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+          {utilizationData.length === 0 ? (
+            <div className="p-6 text-center text-gray-500 dark:text-gray-400">No data for this period</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Tech</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total Hours</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Billable Hours</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Utilization</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Revenue</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Firm Yield</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                {utilizationData.map((row) => (
+                  <tr key={row.techId} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-6 py-3 font-medium text-gray-900 dark:text-gray-100">{row.techName}</td>
+                    <td className="px-6 py-3 text-right text-gray-600 dark:text-gray-400">{row.totalHours}h</td>
+                    <td className="px-6 py-3 text-right text-gray-600 dark:text-gray-400">{row.billableHours}h</td>
+                    <td className="px-6 py-3 text-right">
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                        parseFloat(row.utilization) > 80 ? 'bg-green-100 text-green-700' :
+                        parseFloat(row.utilization) > 50 ? 'bg-blue-100 text-blue-700' :
+                        'bg-amber-100 text-amber-700'
+                      }`}>
+                        {row.utilization}%
+                      </span>
+                    </td>
+                    <td className="px-6 py-3 text-right text-gray-600 dark:text-gray-400">{formatCurrency(row.totalRevenue)}</td>
+                    <td className="px-6 py-3 text-right">
+                      <span className="font-bold text-gray-900 dark:text-gray-100">
+                        {formatCurrency(row.firmYield)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           )}
         </div>
