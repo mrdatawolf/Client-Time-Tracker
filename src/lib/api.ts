@@ -10,6 +10,7 @@ export interface User {
   username: string;
   displayName: string;
   role: 'partner' | 'admin' | 'basic';
+  theme: 'light' | 'dark' | 'system';
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -90,6 +91,12 @@ export const auth = {
     apiClient<{ success: boolean }>('/api/auth/change-password', {
       method: 'POST',
       body: JSON.stringify({ currentPassword, newPassword }),
+    }),
+
+  updatePreferences: (prefs: { theme: 'light' | 'dark' | 'system' }) =>
+    apiClient<User>('/api/auth/preferences', {
+      method: 'POST',
+      body: JSON.stringify(prefs),
     }),
 };
 
@@ -709,7 +716,14 @@ export const supabaseSync = {
     apiClient<SyncStatus>('/api/supabase/status'),
 
   sync: () =>
-    apiClient<{ success: boolean; message: string }>('/api/supabase/sync', {
+    apiClient<{ 
+      success: boolean; 
+      message: string;
+      pushed: number;
+      pulled: number;
+      skippedPush: number;
+      skippedPull: number;
+    }>('/api/supabase/sync', {
       method: 'POST',
     }),
 

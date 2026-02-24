@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -65,8 +66,8 @@ export default function TimeEntryDialog({
   const [hours, setHours] = useState('');
   const [date, setDate] = useState('');
   const [notes, setNotes] = useState('');
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const admin = isAdmin();
   const needsClientPicker = !defaultClientId && !entry;
@@ -202,8 +203,12 @@ export default function TimeEntryDialog({
       }
       onOpenChange(false);
       onSaved();
+      toast.success(entry ? 'Time entry updated' : 'Time entry created');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save');
+      const errorMessage = (err as any)?.body?.error || (err as Error).message || 'An unknown error occurred.';
+      toast.error(entry ? 'Failed to update entry' : 'Failed to create entry', {
+        description: errorMessage,
+      });
     } finally {
       setSaving(false);
     }
@@ -217,8 +222,12 @@ export default function TimeEntryDialog({
       await timeEntriesApi.delete(entry.id);
       onOpenChange(false);
       onSaved();
+      toast.success('Time entry deleted');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete');
+      const errorMessage = (err as any)?.body?.error || (err as Error).message || 'An unknown error occurred.';
+      toast.error('Failed to delete entry', {
+        description: errorMessage,
+      });
     } finally {
       setSaving(false);
     }
@@ -231,12 +240,6 @@ export default function TimeEntryDialog({
           <DialogTitle>{entry ? 'Edit Time Entry' : 'New Time Entry'}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
-          {error && (
-            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">
-              {error}
-            </div>
-          )}
-
           {needsClientPicker && (
             <div className="space-y-2">
               <Label>Client *</Label>
@@ -320,8 +323,8 @@ export default function TimeEntryDialog({
                     }}
                     className={`px-2 py-0.5 rounded text-xs border transition-colors ${
                       rateTierId === rt.id
-                        ? 'bg-blue-100 border-blue-300 text-blue-700'
-                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                        ? 'bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300'
+                        : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
                     }`}
                   >
                     ${rt.amount}{rt.label && rt.label !== `$${rt.amount}` ? ` (${rt.label})` : ''}
@@ -359,9 +362,9 @@ export default function TimeEntryDialog({
           </div>
 
           {computedTotal && (
-            <div className="text-sm text-gray-600 bg-gray-50 rounded p-3">
+            <div className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 rounded p-3">
               Total: <span className="font-semibold">${computedTotal}</span>
-              <span className="ml-2 text-gray-400">
+              <span className="ml-2 text-gray-400 dark:text-gray-500">
                 ({hours}h x ${rateAmount})
               </span>
             </div>
@@ -374,7 +377,7 @@ export default function TimeEntryDialog({
               variant="outline"
               onClick={handleDelete}
               disabled={saving}
-              className="mr-auto text-red-600 hover:text-red-700 hover:bg-red-50"
+              className="mr-auto text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/20"
             >
               Delete
             </Button>

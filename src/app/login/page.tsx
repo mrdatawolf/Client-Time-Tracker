@@ -79,16 +79,16 @@ export default function LoginPage() {
   // Loading state while checking setup status
   if (needsSetup === null) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-500">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-gray-500 dark:text-gray-400">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
       <div className="w-full max-w-sm">
-        <div className="bg-white rounded-lg shadow-md border border-gray-200 p-8">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-8">
           <div className="flex flex-col items-center mb-8">
             <div className={`${needsSetup ? 'bg-green-600' : 'bg-blue-600'} p-3 rounded-full mb-4`}>
               {needsSetup ? (
@@ -97,8 +97,8 @@ export default function LoginPage() {
                 <Clock className="w-8 h-8 text-white" />
               )}
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">Time Tracker</h1>
-            <p className="text-gray-500 text-sm mt-1">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Time Tracker</h1>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
               {needsSetup ? 'Create your admin account to get started' : 'Sign in to your account'}
             </p>
           </div>
@@ -147,7 +147,7 @@ export default function LoginPage() {
               </div>
 
               {error && (
-                <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
+                <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3">
                   {error}
                 </div>
               )}
@@ -186,7 +186,7 @@ export default function LoginPage() {
               </div>
 
               {error && (
-                <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
+                <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3">
                   {error}
                 </div>
               )}

@@ -135,10 +135,10 @@ export default function Dashboard() {
       )}
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
             Welcome back, {user?.displayName || 'User'}
           </h1>
-          <p className="text-gray-500 mt-1">Here&apos;s your time tracking overview</p>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">Here&apos;s your time tracking overview</p>
         </div>
         <Link href="/time-entry">
           <Button>
@@ -152,15 +152,15 @@ export default function Dashboard() {
         {cards.map((card) => (
           <div
             key={card.label}
-            className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm"
+            className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 shadow-sm"
           >
             <div className="flex items-center justify-between mb-4">
-              <span className="text-sm font-medium text-gray-500">{card.label}</span>
+              <span className="text-sm font-medium text-gray-500 dark:text-gray-400">{card.label}</span>
               <div className={`${card.color} p-2 rounded-lg`}>
                 <card.icon className="w-5 h-5 text-white" />
               </div>
             </div>
-            <div className="text-2xl font-bold text-gray-900">
+            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
               {loading ? '...' : card.value}
             </div>
           </div>
@@ -169,17 +169,17 @@ export default function Dashboard() {
 
       {/* Recent Projects */}
       {!loading && recentProjects.length > 0 && (
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden mb-8">
-          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <FolderKanban className="w-5 h-5 text-gray-400" />
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden mb-8">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+              <FolderKanban className="w-5 h-5 text-gray-400 dark:text-gray-500" />
               Recent Projects
             </h2>
-            <Link href="/projects" className="text-sm text-blue-600 hover:underline">
+            <Link href="/projects" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
               View all
             </Link>
           </div>
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-gray-100 dark:divide-gray-700">
             {recentProjects.map((project) => {
               const statusConfig: Record<string, { label: string; bg: string; text: string }> = {
                 in_progress: { label: 'In Progress', bg: 'bg-blue-100', text: 'text-blue-800' },
@@ -194,22 +194,22 @@ export default function Dashboard() {
                 <Link
                   key={project.id}
                   href="/projects"
-                  className="flex items-center gap-3 px-6 py-3 hover:bg-gray-50 transition-colors"
+                  className="flex items-center gap-3 px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900">{project.name}</span>
-                      <span className="text-xs text-gray-400">{project.client?.name}</span>
+                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{project.name}</span>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">{project.client?.name}</span>
                     </div>
                     {project.note && (
-                      <p className="text-xs text-gray-400 truncate mt-0.5">{project.note}</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 truncate mt-0.5">{project.note}</p>
                     )}
                   </div>
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${sc.bg} ${sc.text}`}>
                     {sc.label}
                   </span>
                   {project.assignedTo && (
-                    <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                    <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
                       {project.assignedTo}
                     </span>
                   )}
@@ -220,40 +220,40 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Unbilled Entries</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Unbilled Entries</h2>
         </div>
         {loading ? (
-          <div className="p-6 text-center text-gray-500">Loading...</div>
+          <div className="p-6 text-center text-gray-500 dark:text-gray-400">Loading...</div>
         ) : recentEntries.length === 0 ? (
-          <div className="p-6 text-center text-gray-500">
+          <div className="p-6 text-center text-gray-500 dark:text-gray-400">
             No unbilled entries.{' '}
-            <Link href="/time-entry" className="text-blue-600 hover:underline">
+            <Link href="/time-entry" className="text-blue-600 dark:text-blue-400 hover:underline">
               Add your first entry
             </Link>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Client</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Job Type</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tech</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Hours</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+              <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Client</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Job Type</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Tech</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Hours</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {recentEntries.map((entry) => (
-                <tr key={entry.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-3 text-gray-600">{entry.date}</td>
-                  <td className="px-6 py-3 font-medium">{entry.client?.name || '-'}</td>
-                  <td className="px-6 py-3 text-gray-600">{entry.jobType?.name || '-'}</td>
-                  <td className="px-6 py-3 text-gray-600">{entry.tech?.displayName || '-'}</td>
-                  <td className="px-6 py-3 text-right">{entry.hours}h</td>
-                  <td className="px-6 py-3 text-right font-medium">
+                <tr key={entry.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                  <td className="px-6 py-3 text-gray-600 dark:text-gray-400">{entry.date}</td>
+                  <td className="px-6 py-3 font-medium dark:text-gray-200">{entry.client?.name || '-'}</td>
+                  <td className="px-6 py-3 text-gray-600 dark:text-gray-400">{entry.jobType?.name || '-'}</td>
+                  <td className="px-6 py-3 text-gray-600 dark:text-gray-400">{entry.tech?.displayName || '-'}</td>
+                  <td className="px-6 py-3 text-right dark:text-gray-300">{entry.hours}h</td>
+                  <td className="px-6 py-3 text-right font-medium dark:text-gray-200">
                     {entry.total ? formatCurrency(parseFloat(entry.total)) : '-'}
                   </td>
                 </tr>

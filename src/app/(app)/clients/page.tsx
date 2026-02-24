@@ -5,6 +5,7 @@ import { Briefcase, Plus, Pencil, Trash2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -37,8 +38,8 @@ export default function ClientsPage() {
   const [formPayableTo, setFormPayableTo] = useState('');
   const [formBillingCycle, setFormBillingCycle] = useState('');
   const [formBillingDay, setFormBillingDay] = useState('');
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
   const [partners, setPartners] = useState<User[]>([]);
 
   const loadClients = useCallback(async () => {
@@ -144,8 +145,12 @@ export default function ClientsPage() {
       }
       setDialogOpen(false);
       loadClients();
+      toast.success(editing ? 'Client updated' : 'Client created');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save');
+      const errorMessage = (err as any)?.body?.error || (err as Error).message || 'An unknown error occurred.';
+      toast.error(editing ? 'Failed to update client' : 'Failed to create client', {
+        description: errorMessage,
+      });
     } finally {
       setSaving(false);
     }
@@ -156,8 +161,12 @@ export default function ClientsPage() {
     try {
       await clientsApi.delete(client.id);
       loadClients();
+      toast.success('Client deactivated');
     } catch (err) {
-      console.error('Failed to deactivate client:', err);
+      const errorMessage = (err as any)?.body?.error || (err as Error).message || 'An unknown error occurred.';
+      toast.error('Failed to deactivate client', {
+        description: errorMessage,
+      });
     }
   }
 
@@ -165,8 +174,12 @@ export default function ClientsPage() {
     try {
       await clientsApi.update(client.id, { isActive: true });
       loadClients();
+      toast.success('Client reactivated');
     } catch (err) {
-      console.error('Failed to reactivate client:', err);
+      const errorMessage = (err as any)?.body?.error || (err as Error).message || 'An unknown error occurred.';
+      toast.error('Failed to reactivate client', {
+        description: errorMessage,
+      });
     }
   }
 
@@ -174,11 +187,11 @@ export default function ClientsPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
             <Briefcase className="w-6 h-6" />
             Clients
           </h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
             {clientList.filter((c) => c.isActive).length} active clients
           </p>
         </div>
@@ -199,11 +212,11 @@ export default function ClientsPage() {
       </div>
 
       {loading ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-8 text-center text-gray-500 dark:text-gray-400">
           Loading...
         </div>
       ) : activeClients.length === 0 ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-8 text-center text-gray-500 dark:text-gray-400">
           {search ? 'No clients match your search' : 'No clients yet. Click "Add Client" to create one.'}
         </div>
       ) : (
@@ -212,10 +225,10 @@ export default function ClientsPage() {
             {activeClients.map((client) => (
               <div
                 key={client.id}
-                className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-4 flex flex-col"
+                className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow p-4 flex flex-col"
               >
                 <div className="flex items-start justify-between mb-2">
-                  <h3 className="font-semibold text-gray-900 truncate flex-1">{client.name}</h3>
+                  <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate flex-1">{client.name}</h3>
                   <div className="flex items-center gap-0.5 ml-2 flex-shrink-0">
                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(client)}>
                       <Pencil className="w-3.5 h-3.5" />
@@ -225,50 +238,50 @@ export default function ClientsPage() {
                     </Button>
                   </div>
                 </div>
-                <div className="text-xs text-gray-500 space-y-1 flex-1">
+                <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1 flex-1">
                   <div className="flex items-center gap-1">
-                    <span className="font-medium text-gray-600">Holder:</span>
+                    <span className="font-medium text-gray-600 dark:text-gray-400">Holder:</span>
                     <span className="truncate">{getHolderName(client)}</span>
                   </div>
                   {client.phone && (
                     <div className="flex items-center gap-1">
-                      <span className="font-medium text-gray-600">Phone:</span>
+                      <span className="font-medium text-gray-600 dark:text-gray-400">Phone:</span>
                       <span className="truncate">{client.phone}</span>
                     </div>
                   )}
                   {client.defaultHourlyRate && (
                     <div className="flex items-center gap-1">
-                      <span className="font-medium text-gray-600">Rate:</span>
+                      <span className="font-medium text-gray-600 dark:text-gray-400">Rate:</span>
                       <span>${client.defaultHourlyRate}/hr</span>
                     </div>
                   )}
                   {client.billingCycle && (
                     <div className="flex items-center gap-1">
-                      <span className="font-medium text-gray-600">Billing:</span>
+                      <span className="font-medium text-gray-600 dark:text-gray-400">Billing:</span>
                       <span className="capitalize">{client.billingCycle}</span>
                     </div>
                   )}
                 </div>
                 {(parseFloat(client.unbilledTotal || '0') > 0 || parseFloat(client.billedUnpaidTotal || '0') > 0) && (
-                  <div className="flex gap-3 mt-2 pt-2 border-t border-gray-100 text-xs">
+                  <div className="flex gap-3 mt-2 pt-2 border-t border-gray-100 dark:border-gray-700 text-xs">
                     {parseFloat(client.unbilledTotal || '0') > 0 && (
                       <div className="flex items-center gap-1">
                         <span className="inline-block w-2 h-2 rounded-full bg-amber-400" />
-                        <span className="text-gray-500">Unbilled</span>
-                        <span className="font-medium text-amber-700">{formatCurrency(parseFloat(client.unbilledTotal!))}</span>
+                        <span className="text-gray-500 dark:text-gray-400">Unbilled</span>
+                        <span className="font-medium text-amber-700 dark:text-amber-400">{formatCurrency(parseFloat(client.unbilledTotal!))}</span>
                       </div>
                     )}
                     {parseFloat(client.billedUnpaidTotal || '0') > 0 && (
                       <div className="flex items-center gap-1">
                         <span className="inline-block w-2 h-2 rounded-full bg-blue-400" />
-                        <span className="text-gray-500">Unpaid</span>
-                        <span className="font-medium text-blue-700">{formatCurrency(parseFloat(client.billedUnpaidTotal!))}</span>
+                        <span className="text-gray-500 dark:text-gray-400">Unpaid</span>
+                        <span className="font-medium text-blue-700 dark:text-blue-400">{formatCurrency(parseFloat(client.billedUnpaidTotal!))}</span>
                       </div>
                     )}
                   </div>
                 )}
                 {client.notes && (
-                  <p className="text-xs text-gray-400 mt-2 truncate border-t border-gray-100 pt-2">{client.notes}</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-2 truncate border-t border-gray-100 dark:border-gray-700 pt-2">{client.notes}</p>
                 )}
               </div>
             ))}
@@ -276,18 +289,18 @@ export default function ClientsPage() {
 
           {inactiveClients.length > 0 && (
             <details className="mt-6">
-              <summary className="text-sm text-gray-500 cursor-pointer hover:text-gray-700">
+              <summary className="text-sm text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300">
                 {inactiveClients.length} inactive client{inactiveClients.length > 1 ? 's' : ''}
               </summary>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-3">
                 {inactiveClients.map((client) => (
                   <div
                     key={client.id}
-                    className="bg-white rounded-lg border border-gray-200 p-4 opacity-60 flex items-center justify-between"
+                    className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 opacity-60 flex items-center justify-between"
                   >
                     <div>
-                      <h3 className="font-medium text-gray-700 text-sm">{client.name}</h3>
-                      <p className="text-xs text-gray-400">{getHolderName(client)}</p>
+                      <h3 className="font-medium text-gray-700 dark:text-gray-300 text-sm">{client.name}</h3>
+                      <p className="text-xs text-gray-400 dark:text-gray-500">{getHolderName(client)}</p>
                     </div>
                     <Button variant="ghost" size="sm" onClick={() => handleReactivate(client)}>
                       Reactivate
@@ -306,11 +319,6 @@ export default function ClientsPage() {
             <DialogTitle>{editing ? 'Edit Client' : 'New Client'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            {error && (
-              <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">
-                {error}
-              </div>
-            )}
             <div className="space-y-2">
               <Label htmlFor="name">Client Name *</Label>
               <Input
@@ -426,13 +434,13 @@ export default function ClientsPage() {
               <Label htmlFor="payableTo">Invoice &quot;Payable To&quot; Override</Label>
               <textarea
                 id="payableTo"
-                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="flex w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 dark:text-gray-100 px-3 py-2 text-sm placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                 rows={3}
                 value={formPayableTo}
                 onChange={(e) => setFormPayableTo(e.target.value)}
                 placeholder="Leave blank to use global default"
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 Overrides the global &quot;Payable To&quot; on invoices for this client.
               </p>
             </div>

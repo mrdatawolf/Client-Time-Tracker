@@ -92,21 +92,21 @@ export default function AuditLogPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
           <ScrollText className="w-6 h-6" />
           Audit Log
         </h1>
-        <p className="text-gray-500 mt-1">Track all changes made in the system</p>
+        <p className="text-gray-500 dark:text-gray-400 mt-1">Track all changes made in the system</p>
       </div>
 
       {/* Filters */}
       <div className="flex flex-wrap items-end gap-3 mb-6">
         <div className="space-y-1">
-          <label className="text-xs font-medium text-gray-500">Table</label>
+          <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Table</label>
           <select
             value={tableFilter}
             onChange={(e) => { setTableFilter(e.target.value); handleFilterChange(); }}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm bg-white h-9"
+            className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 h-9"
           >
             {TABLE_OPTIONS.map((t) => (
               <option key={t.value} value={t.value}>{t.label}</option>
@@ -114,11 +114,11 @@ export default function AuditLogPage() {
           </select>
         </div>
         <div className="space-y-1">
-          <label className="text-xs font-medium text-gray-500">User</label>
+          <label className="text-xs font-medium text-gray-500 dark:text-gray-400">User</label>
           <select
             value={userFilter}
             onChange={(e) => { setUserFilter(e.target.value); handleFilterChange(); }}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm bg-white h-9"
+            className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 h-9"
           >
             <option value="">All Users</option>
             {userList.map((u) => (
@@ -129,46 +129,46 @@ export default function AuditLogPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-gray-500">Loading...</div>
+          <div className="p-8 text-center text-gray-500 dark:text-gray-400">Loading...</div>
         ) : entries.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No audit log entries found</div>
+          <div className="p-8 text-center text-gray-500 dark:text-gray-400">No audit log entries found</div>
         ) : (
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Table</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Record</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Details</th>
+                  <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Time</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">User</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Action</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Table</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Record</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Details</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                   {entries.map((entry) => (
                     <tr
                       key={entry.id}
-                      className="hover:bg-gray-50 cursor-pointer"
+                      className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
                       onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
                     >
-                      <td className="px-4 py-2 text-gray-600 whitespace-nowrap">{formatDate(entry.createdAt)}</td>
-                      <td className="px-4 py-2 text-gray-600 whitespace-nowrap">{formatTime(entry.createdAt)}</td>
-                      <td className="px-4 py-2 text-gray-900">{entry.userName || '-'}</td>
+                      <td className="px-4 py-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">{formatDate(entry.createdAt)}</td>
+                      <td className="px-4 py-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">{formatTime(entry.createdAt)}</td>
+                      <td className="px-4 py-2 text-gray-900 dark:text-gray-100">{entry.userName || '-'}</td>
                       <td className="px-4 py-2">
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${actionColors[entry.action] || 'bg-gray-100 text-gray-700'}`}>
                           {entry.action}
                         </span>
                       </td>
-                      <td className="px-4 py-2 text-gray-600 font-mono text-xs">{entry.tableName}</td>
-                      <td className="px-4 py-2 text-gray-500 font-mono text-xs">
+                      <td className="px-4 py-2 text-gray-600 dark:text-gray-400 font-mono text-xs">{entry.tableName}</td>
+                      <td className="px-4 py-2 text-gray-500 dark:text-gray-400 font-mono text-xs">
                         {entry.recordId ? entry.recordId.slice(0, 8) + '...' : '-'}
                       </td>
-                      <td className="px-4 py-2 text-gray-500 text-xs">
+                      <td className="px-4 py-2 text-gray-500 dark:text-gray-400 text-xs">
                         {expandedId === entry.id ? 'Click to collapse' : formatJsonPreview(entry.newValues)}
                       </td>
                     </tr>
@@ -179,17 +179,17 @@ export default function AuditLogPage() {
 
             {/* Expanded detail view */}
             {expandedId && entries.find(e => e.id === expandedId)?.newValues && (
-              <div className="border-t border-gray-200 bg-gray-50 p-4">
-                <p className="text-xs font-medium text-gray-500 mb-2">New Values:</p>
-                <pre className="text-xs text-gray-700 bg-white p-3 rounded border overflow-x-auto max-h-64">
+              <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-4">
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">New Values:</p>
+                <pre className="text-xs text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 p-3 rounded border dark:border-gray-700 overflow-x-auto max-h-64">
                   {JSON.stringify(JSON.parse(entries.find(e => e.id === expandedId)!.newValues!), null, 2)}
                 </pre>
               </div>
             )}
 
             {/* Pagination */}
-            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
-              <span className="text-sm text-gray-500">
+            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+              <span className="text-sm text-gray-500 dark:text-gray-400">
                 Showing {offset + 1}-{offset + entries.length}
               </span>
               <div className="flex gap-2">

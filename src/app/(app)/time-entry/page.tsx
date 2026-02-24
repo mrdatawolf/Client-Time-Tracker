@@ -14,11 +14,11 @@ export default function TimeEntryPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
           <Clock className="w-6 h-6" />
           Time Entry
         </h1>
-        <p className="text-gray-500 mt-1">Log hours for a client by day</p>
+        <p className="text-gray-500 dark:text-gray-400 mt-1">Log hours for a client by day</p>
       </div>
 
       <div className="flex flex-wrap items-end gap-4 mb-6">

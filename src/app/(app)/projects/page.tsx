@@ -230,11 +230,11 @@ export default function ProjectsPage() {
       <div className={`flex-1 overflow-auto ${chatClientId ? 'pr-0' : ''}`}>
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
               <FolderKanban className="w-6 h-6" />
               Projects
             </h1>
-            <p className="text-gray-500 mt-1">
+            <p className="text-gray-500 dark:text-gray-400 mt-1">
               {activeProjects.length} active project{activeProjects.length !== 1 ? 's' : ''} across {clientsWithProjects.length} client{clientsWithProjects.length !== 1 ? 's' : ''}
             </p>
           </div>
@@ -245,14 +245,14 @@ export default function ProjectsPage() {
         </div>
 
         {loading ? (
-          <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500">
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-8 text-center text-gray-500 dark:text-gray-400">
             Loading...
           </div>
         ) : activeProjects.length === 0 ? (
-          <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-            <FolderKanban className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <h2 className="text-lg font-medium text-gray-900 mb-2">No projects yet</h2>
-            <p className="text-gray-500 mb-4">Add your first project to start tracking client work.</p>
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-12 text-center">
+            <FolderKanban className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No projects yet</h2>
+            <p className="text-gray-500 dark:text-gray-400 mb-4">Add your first project to start tracking client work.</p>
             <Button onClick={() => openCreate()}>
               <Plus className="w-4 h-4 mr-2" />
               Add Project
@@ -280,16 +280,16 @@ export default function ProjectsPage() {
             {/* Clients without projects */}
             {clientsWithoutProjects.length > 0 && (
               <details className="mt-6">
-                <summary className="text-sm text-gray-400 cursor-pointer hover:text-gray-600 mb-2">
+                <summary className="text-sm text-gray-400 dark:text-gray-500 cursor-pointer hover:text-gray-600 dark:hover:text-gray-300 mb-2">
                   {clientsWithoutProjects.length} client{clientsWithoutProjects.length !== 1 ? 's' : ''} with no projects
                 </summary>
                 <div className="space-y-2">
                   {clientsWithoutProjects.map((client) => (
                     <div
                       key={client.id}
-                      className="bg-white rounded-lg border border-gray-200 px-4 py-3 flex items-center justify-between opacity-60"
+                      className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between opacity-60"
                     >
-                      <span className="text-sm font-medium text-gray-700">{client.name}</span>
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{client.name}</span>
                       <Button variant="ghost" size="sm" onClick={() => openCreate(client.id)}>
                         <Plus className="w-3 h-3 mr-1" />
                         Add
@@ -305,23 +305,23 @@ export default function ProjectsPage() {
 
       {/* Chat panel */}
       {chatClientId && (
-        <div className="w-80 border-l border-gray-200 bg-white flex flex-col ml-4 rounded-lg overflow-hidden shadow-sm">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
+        <div className="w-80 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col ml-4 rounded-lg overflow-hidden shadow-sm">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
             <div className="flex items-center gap-2 min-w-0">
-              <MessageSquare className="w-4 h-4 text-gray-500 shrink-0" />
-              <span className="text-sm font-medium text-gray-700 truncate">
+              <MessageSquare className="w-4 h-4 text-gray-500 dark:text-gray-400 shrink-0" />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
                 {chatClient?.name || 'Chat'}
               </span>
             </div>
             <button
               onClick={() => setChatClientId(null)}
-              className="p-1 rounded hover:bg-gray-200 transition-colors"
+              className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             >
               <X className="w-4 h-4 text-gray-400" />
             </button>
           </div>
           <textarea
-            className="flex-1 p-3 text-sm text-gray-700 resize-none focus:outline-none font-mono leading-relaxed"
+            className="flex-1 p-3 text-sm text-gray-700 dark:text-gray-300 dark:bg-gray-800 resize-none focus:outline-none font-mono leading-relaxed"
             placeholder="Paste Telegram chat history here..."
             value={chatContent}
             onChange={(e) => {
@@ -329,8 +329,8 @@ export default function ProjectsPage() {
               setChatDirty(true);
             }}
           />
-          <div className="px-3 py-2 border-t border-gray-200 flex items-center justify-between">
-            <span className="text-xs text-gray-400">
+          <div className="px-3 py-2 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <span className="text-xs text-gray-400 dark:text-gray-500">
               {chatDirty ? 'Unsaved changes' : 'Saved'}
             </span>
             <Button
@@ -353,7 +353,7 @@ export default function ProjectsPage() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             {error && (
-              <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">
+              <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-2">
                 {error}
               </div>
             )}
@@ -461,7 +461,7 @@ function StatusChip({
         <ChevronDown className="w-3 h-3" />
       </button>
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 py-1 min-w-[180px]">
+        <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 py-1 min-w-[180px]">
           {ALL_STATUSES.map((s) => {
             const sc = STATUS_CONFIG[s];
             return (
@@ -471,7 +471,7 @@ function StatusChip({
                   e.stopPropagation();
                   onChange(projectId, s);
                 }}
-                className={`w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 flex items-center gap-2 ${
+                className={`w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-200 flex items-center gap-2 ${
                   s === status ? 'font-medium' : ''
                 }`}
               >
@@ -510,10 +510,10 @@ function ClientCard({
   chatActive: boolean;
 }) {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
       {/* Client header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
-        <h3 className="text-sm font-semibold text-gray-800">{client.name}</h3>
+      <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">{client.name}</h3>
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
@@ -531,15 +531,15 @@ function ClientCard({
       </div>
 
       {/* Project rows */}
-      <div className="divide-y divide-gray-100">
+      <div className="divide-y divide-gray-100 dark:divide-gray-700">
         {projects.map((project) => (
           <div
             key={project.id}
-            className="px-4 py-2.5 flex items-center gap-3 hover:bg-gray-50 group"
+            className="px-4 py-2.5 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 group"
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-medium text-gray-900">{project.name}</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{project.name}</span>
                 <StatusChip
                   status={project.status}
                   projectId={project.id}
@@ -548,13 +548,13 @@ function ClientCard({
                   onChange={onStatusChange}
                 />
                 {project.assignedTo && (
-                  <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                  <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
                     {project.assignedTo}
                   </span>
                 )}
               </div>
               {project.note && (
-                <p className="text-xs text-gray-400 mt-0.5 truncate">{project.note}</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">{project.note}</p>
               )}
             </div>
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

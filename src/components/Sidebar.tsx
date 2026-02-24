@@ -25,6 +25,8 @@ import {
 import { cn } from '@/lib/utils';
 import { clearToken, getUser } from '@/lib/api-client';
 import { supabaseSync, type SyncStatus } from '@/lib/api';
+import { ThemeToggle } from './ThemeToggle';
+import { toast } from 'sonner';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -69,12 +71,25 @@ export function Sidebar() {
     return () => { cancelled = true; clearInterval(interval); };
   }, [isAdminOrPartner]);
 
+
   async function handleSync() {
     setSyncing(true);
     try {
-      await supabaseSync.sync();
+      const result = await supabaseSync.sync();
       setSyncStatus(await supabaseSync.getStatus());
-    } catch { /* ignore */ }
+      toast.success('Sync complete', {
+        description: `Pushed ${result.pushed} and pulled ${result.pulled} records.`,
+      });
+    } catch (err) {
+      const errorMessage = (err as any)?.body?.error || (err as Error).message || 'An unknown error occurred.';
+      toast.error('Sync failed', {
+        description: errorMessage,
+      });
+      // Also update status to show error state
+      try {
+        setSyncStatus(await supabaseSync.getStatus());
+      } catch {} // ignore if status fetch fails
+    }
     finally { setSyncing(false); }
   }
 
@@ -185,6 +200,11 @@ export function Sidebar() {
           </div>
         </div>
       )}
+
+      {/* Theme toggle */}
+      <div className={cn('border-t border-gray-700 px-3 py-2', collapsed && 'flex justify-center')}>
+        <ThemeToggle collapsed={collapsed} />
+      </div>
 
       {/* User section */}
       <div className="border-t border-gray-700 p-3">

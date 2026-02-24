@@ -14,7 +14,24 @@ export function formatCurrency(amount: number | string): string {
 }
 
 export function formatDate(date: string | Date): string {
-  const d = typeof date === 'string' ? new Date(date + 'T00:00:00') : date;
+  let d: Date;
+
+  if (typeof date === 'string') {
+    // If it's a date-only string (e.g., '2026-02-23'), append time to parse it in the local timezone.
+    // If it's a full ISO string with a time component, parse it directly.
+    if (date.includes('T')) {
+      d = new Date(date);
+    } else {
+      d = new Date(`${date}T00:00:00`);
+    }
+  } else {
+    d = date;
+  }
+
+  if (isNaN(d.getTime())) {
+    return 'Invalid Date';
+  }
+
   return d.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',

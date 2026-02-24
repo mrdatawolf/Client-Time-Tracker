@@ -134,7 +134,7 @@ export default function GenerateInvoiceDialog({
         </DialogHeader>
         <div className="space-y-4 py-2">
           {error && (
-            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">
+            <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-2">
               {error}
             </div>
           )}
@@ -193,20 +193,20 @@ export default function GenerateInvoiceDialog({
           </div>
 
           {/* Preview */}
-          <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
-              <span className="text-sm font-medium text-gray-700">
+          <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+            <div className="bg-gray-50 dark:bg-gray-900 px-4 py-2 border-b border-gray-200 dark:border-gray-700">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Preview: Unbilled Entries
               </span>
             </div>
             {loadingPreview ? (
-              <div className="p-4 text-center text-sm text-gray-500">Loading...</div>
+              <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400">Loading...</div>
             ) : !clientId ? (
-              <div className="p-4 text-center text-sm text-gray-400">
+              <div className="p-4 text-center text-sm text-gray-400 dark:text-gray-500">
                 Select a client to preview entries
               </div>
             ) : unbilledEntries.length === 0 ? (
-              <div className="p-4 text-center text-sm text-gray-400">
+              <div className="p-4 text-center text-sm text-gray-400 dark:text-gray-500">
                 No unbilled entries for this period
               </div>
             ) : (
@@ -214,18 +214,18 @@ export default function GenerateInvoiceDialog({
                 <div className="max-h-48 overflow-y-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="bg-gray-50 border-b border-gray-100">
-                        <th className="px-3 py-1.5 text-left font-medium text-gray-500">Date</th>
-                        <th className="px-3 py-1.5 text-left font-medium text-gray-500">Job</th>
-                        <th className="px-3 py-1.5 text-right font-medium text-gray-500">Hours</th>
-                        <th className="px-3 py-1.5 text-right font-medium text-gray-500">Total</th>
+                      <tr className="bg-gray-50 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-700">
+                        <th className="px-3 py-1.5 text-left font-medium text-gray-500 dark:text-gray-400">Date</th>
+                        <th className="px-3 py-1.5 text-left font-medium text-gray-500 dark:text-gray-400">Job</th>
+                        <th className="px-3 py-1.5 text-right font-medium text-gray-500 dark:text-gray-400">Hours</th>
+                        <th className="px-3 py-1.5 text-right font-medium text-gray-500 dark:text-gray-400">Total</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-50">
+                    <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                       {unbilledEntries.map((e) => (
                         <tr key={e.id}>
-                          <td className="px-3 py-1.5 text-gray-600">{e.date}</td>
-                          <td className="px-3 py-1.5 text-gray-600">{e.jobType?.name || '-'}</td>
+                          <td className="px-3 py-1.5 text-gray-600 dark:text-gray-400">{e.date}</td>
+                          <td className="px-3 py-1.5 text-gray-600 dark:text-gray-400">{e.jobType?.name || '-'}</td>
                           <td className="px-3 py-1.5 text-right">{e.hours}h</td>
                           <td className="px-3 py-1.5 text-right font-medium">
                             {e.total ? formatCurrency(parseFloat(e.total)) : '-'}
@@ -235,11 +235,11 @@ export default function GenerateInvoiceDialog({
                     </tbody>
                   </table>
                 </div>
-                <div className="px-4 py-2 bg-gray-50 border-t border-gray-200 flex justify-between text-sm">
-                  <span className="text-gray-600">
+                <div className="px-4 py-2 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">
                     {unbilledEntries.length} entries | {previewHours.toFixed(1)}h
                   </span>
-                  <span className="font-semibold text-gray-800">
+                  <span className="font-semibold text-gray-800 dark:text-gray-200">
                     {formatCurrency(previewTotal)}
                   </span>
                 </div>
