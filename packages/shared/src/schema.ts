@@ -116,7 +116,7 @@ export const timeEntries = pgTable('time_entries', {
 export const invoiceLineItems = pgTable('invoice_line_items', {
   id: uuid('id').defaultRandom().primaryKey(),
   invoiceId: uuid('invoice_id').notNull().references(() => invoices.id),
-  timeEntryId: uuid('time_entry_id').references(() => timeEntries.id),
+  timeEntryId: uuid('time_entry_id').references(() => timeEntries.id, { onDelete: 'set null' }),
   description: text('description').notNull(),
   hours: numeric('hours', { precision: 6, scale: 2 }).notNull(),
   rate: numeric('rate', { precision: 10, scale: 2 }).notNull(),

@@ -40,18 +40,18 @@ route.get('/', async (c) => {
       tech: { columns: { id: true, username: true, displayName: true, role: true, isActive: true } },
       jobType: true,
       rateTier: true,
-      invoice: { columns: { id: true, status: true } },
+      invoice: { columns: { id: true, status: true, invoiceNumber: true } },
     },
     orderBy: (timeEntries, { desc }) => [desc(timeEntries.date)],
   });
 
   // Compute totals and derive invoicePaid from linked invoice status
-  const result = entries.map(({ invoice, ...entry }) => ({
+  const result = entries.map((entry) => ({
     ...entry,
     total: entry.rateTier
       ? String(parseFloat(entry.hours) * parseFloat(entry.rateTier.amount))
       : null,
-    invoicePaid: invoice?.status === 'paid',
+    invoicePaid: entry.invoice?.status === 'paid',
   }));
 
   return c.json(result);
@@ -91,17 +91,17 @@ route.get('/grid', async (c) => {
       tech: { columns: { id: true, displayName: true } },
       jobType: true,
       rateTier: true,
-      invoice: { columns: { id: true, status: true } },
+      invoice: { columns: { id: true, status: true, invoiceNumber: true } },
     },
     orderBy: (timeEntries, { asc }) => [asc(timeEntries.date)],
   });
 
-  const result = entries.map(({ invoice, ...entry }) => ({
+  const result = entries.map((entry) => ({
     ...entry,
     total: entry.rateTier
       ? String(parseFloat(entry.hours) * parseFloat(entry.rateTier.amount))
       : null,
-    invoicePaid: invoice?.status === 'paid',
+    invoicePaid: entry.invoice?.status === 'paid',
   }));
 
   return c.json(result);
@@ -294,6 +294,9 @@ route.delete('/:id', async (c) => {
 
   const existing = await db.query.timeEntries.findFirst({
     where: eq(timeEntries.id, id),
+    with: {
+      invoice: true,
+    },
   });
 
   if (!existing) {
@@ -302,6 +305,12 @@ route.delete('/:id', async (c) => {
 
   if (role === 'basic' && existing.techId !== userId) {
     return c.json({ error: 'Forbidden' }, 403);
+  }
+
+  // If linked to a draft invoice, delete the line item too
+  if (existing.invoiceId && existing.invoice?.status === 'draft') {
+    const { invoiceLineItems } = await import('@ctt/shared/schema');
+    await db.delete(invoiceLineItems).where(eq(invoiceLineItems.timeEntryId, id));
   }
 
   await db.delete(timeEntries).where(eq(timeEntries.id, id));

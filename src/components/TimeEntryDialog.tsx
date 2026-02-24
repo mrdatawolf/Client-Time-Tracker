@@ -66,6 +66,8 @@ export default function TimeEntryDialog({
   const [hours, setHours] = useState('');
   const [date, setDate] = useState('');
   const [notes, setNotes] = useState('');
+  const [isBilled, setIsBilled] = useState(false);
+  const [isPaid, setIsPaid] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -112,6 +114,8 @@ export default function TimeEntryDialog({
         setHours(entry.hours);
         setDate(entry.date);
         setNotes(entry.notes || '');
+        setIsBilled(entry.isBilled);
+        setIsPaid(entry.isPaid);
       } else {
         setClientId(defaultClientId || '');
         setJobTypeId('');
@@ -121,6 +125,8 @@ export default function TimeEntryDialog({
         setHours('');
         setDate(defaultDate || toISODate(new Date()));
         setNotes('');
+        setIsBilled(false);
+        setIsPaid(false);
       }
       setError('');
     }
@@ -188,15 +194,17 @@ export default function TimeEntryDialog({
           date,
           notes: notes || undefined,
           ...(admin && techId ? { techId } : {}),
+          ...(admin ? { isBilled, isPaid } : {}),
         });
       } else {
-        const data: CreateTimeEntry = {
+        const data: CreateTimeEntry & { isBilled?: boolean; isPaid?: boolean } = {
           clientId: resolvedClientId,
           jobTypeId,
           rateTierId: resolvedTierId,
           hours: h,
           date,
           notes: notes || undefined,
+          ...(admin ? { isBilled, isPaid } : {}),
         };
         if (admin && techId) data.techId = techId;
         await timeEntriesApi.create(data);
@@ -216,7 +224,17 @@ export default function TimeEntryDialog({
 
   async function handleDelete() {
     if (!entry) return;
-    if (!confirm('Delete this time entry?')) return;
+
+    let confirmMsg = 'Delete this time entry?';
+    if (entry.invoice) {
+      if (entry.invoice.status === 'draft') {
+        confirmMsg = `This entry is linked to Draft Invoice #${entry.invoice.invoiceNumber}. Deleting it will also remove it from that invoice. Proceed?`;
+      } else {
+        confirmMsg = `This entry is linked to Invoice #${entry.invoice.invoiceNumber} (${entry.invoice.status}). Deleting it will unlink it from the invoice but will NOT change the invoice total. Proceed?`;
+      }
+    }
+
+    if (!confirm(confirmMsg)) return;
     setSaving(true);
     try {
       await timeEntriesApi.delete(entry.id);
@@ -360,6 +378,31 @@ export default function TimeEntryDialog({
               placeholder="Optional notes..."
             />
           </div>
+
+          {admin && (
+            <div className="flex gap-6 py-1">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="isBilled"
+                  checked={isBilled}
+                  onChange={(e) => setIsBilled(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600 dark:border-gray-700 dark:bg-gray-900"
+                />
+                <Label htmlFor="isBilled" className="cursor-pointer">Billed</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="isPaid"
+                  checked={isPaid}
+                  onChange={(e) => setIsPaid(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600 dark:border-gray-700 dark:bg-gray-900"
+                />
+                <Label htmlFor="isPaid" className="cursor-pointer">Paid</Label>
+              </div>
+            </div>
+          )}
 
           {computedTotal && (
             <div className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 rounded p-3">

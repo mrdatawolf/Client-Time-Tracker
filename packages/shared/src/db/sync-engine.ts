@@ -269,6 +269,27 @@ export async function pullChanges(): Promise<{ pulled: number; skipped: number; 
       }
     }
 
+    // Process remote deletes
+    try {
+      const remoteDeletes = await pool.query(
+        `SELECT * FROM remote_sync_changelog WHERE changed_at > $1 AND operation = 'DELETE' ORDER BY changed_at ASC`,
+        [lastSyncAt.toISOString()]
+      );
+
+      for (const del of remoteDeletes.rows) {
+        // Ensure table exists in our sync list
+        if (SYNC_TABLE_ORDER.includes(del.table_name as any)) {
+          await localClient.transaction(async (tx: any) => {
+            await tx.query("SET LOCAL app.syncing = 'true'");
+            await tx.query(`DELETE FROM ${del.table_name} WHERE id = $1`, [del.record_id]);
+          });
+          pulled++;
+        }
+      }
+    } catch (e) {
+      console.error('Error syncing remote deletes:', e);
+    }
+
     // Also sync app_settings (special: text PK, not UUID)
     await pullAppSettings(pool, localClient, lastSyncAt);
 

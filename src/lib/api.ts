@@ -70,6 +70,7 @@ export interface TimeEntry {
   // Computed/joined
   total?: string | null;
   invoicePaid?: boolean;
+  invoice?: { id: string; status: 'draft' | 'sent' | 'paid' | 'void'; invoiceNumber?: string };
   client?: Client;
   tech?: Pick<User, 'id' | 'username' | 'displayName' | 'role' | 'isActive'>;
   jobType?: JobType;
@@ -467,25 +468,126 @@ export interface BalanceEntry {
   jobTypeId: string;
 }
 
-export const reports = {
-  clientSummary: (filters?: { dateFrom?: string; dateTo?: string }) => {
-    const params = new URLSearchParams();
-    if (filters?.dateFrom) params.set('dateFrom', filters.dateFrom);
-    if (filters?.dateTo) params.set('dateTo', filters.dateTo);
-    const qs = params.toString();
-    return apiClient<ClientSummary[]>(`/api/reports/client-summary${qs ? `?${qs}` : ''}`);
-  },
+export interface PartnerSettlementReport {
+  id: string;
+  name: string;
+  earnedAsTech: string;
+  earnedAsHolder: string;
+  totalEarned: string;
+  totalPaid: string;
+  balance: string;
+}
 
-  techSummary: (filters?: { dateFrom?: string; dateTo?: string }) => {
-    const params = new URLSearchParams();
-    if (filters?.dateFrom) params.set('dateFrom', filters.dateFrom);
-    if (filters?.dateTo) params.set('dateTo', filters.dateTo);
-    const qs = params.toString();
-    return apiClient<TechSummary[]>(`/api/reports/tech-summary${qs ? `?${qs}` : ''}`);
-  },
-
-  dateRange: (filters?: { dateFrom?: string; dateTo?: string; clientId?: string }) => {
-    const params = new URLSearchParams();
+  export interface AgedReceivablesReport {
+    invoices: Array<{
+      id: string;
+      invoiceNumber: string;
+      dateIssued: string;
+      clientName: string;
+      balance: string;
+      daysOld: number;
+      bucket: string;
+    }>;
+    summary: Array<{
+      name: string;
+      current: string;
+      thirtyToSixty: string;
+      sixtyToNinety: string;
+      ninetyPlus: string;
+      total: string;
+    }>;
+  }
+  
+  export interface WipReport {
+    entries: Array<{
+      id: string;
+      date: string;
+      hours: string;
+      clientName: string;
+      techName: string;
+      rate: string;
+      revenue: string;
+      daysOld: number;
+    }>;
+    summary: Array<{
+      id: string;
+      name: string;
+      totalHours: string;
+      totalRevenue: string;
+      staleHours: string;
+      staleRevenue: string;
+      oldestEntryDate: string;
+    }>;
+  }
+  
+  export interface EffectiveRateReport {
+    clientId: string;
+    clientName: string;
+    totalHours: string;
+    totalRevenue: string;
+    effectiveRate: string;
+  }
+  
+  export interface TechUtilizationReport {
+    techId: string;
+    techName: string;
+    totalHours: string;
+    billableHours: string;
+    utilization: string;
+    totalRevenue: string;
+    firmYield: string;
+  }
+  
+  export const reports = {
+    clientSummary: (filters?: { dateFrom?: string; dateTo?: string }) => {
+      const params = new URLSearchParams();
+      if (filters?.dateFrom) params.set('dateFrom', filters.dateFrom);
+      if (filters?.dateTo) params.set('dateTo', filters.dateTo);
+      const qs = params.toString();
+      return apiClient<ClientSummary[]>(`/api/reports/client-summary${qs ? `?${qs}` : ''}`);
+    },
+  
+    techSummary: (filters?: { dateFrom?: string; dateTo?: string }) => {
+      const params = new URLSearchParams();
+      if (filters?.dateFrom) params.set('dateFrom', filters.dateFrom);
+      if (filters?.dateTo) params.set('dateTo', filters.dateTo);
+      const qs = params.toString();
+      return apiClient<TechSummary[]>(`/api/reports/tech-summary${qs ? `?${qs}` : ''}`);
+    },
+  
+    partnerSettlement: (filters?: { dateFrom?: string; dateTo?: string }) => {
+      const params = new URLSearchParams();
+      if (filters?.dateFrom) params.set('dateFrom', filters.dateFrom);
+      if (filters?.dateTo) params.set('dateTo', filters.dateTo);
+      const qs = params.toString();
+      return apiClient<PartnerSettlementReport[]>(`/api/reports/partner-settlement${qs ? `?${qs}` : ''}`);
+    },
+  
+    agedReceivables: () => {
+      return apiClient<AgedReceivablesReport>('/api/reports/aged-receivables');
+    },
+  
+    wip: () => {
+      return apiClient<WipReport>('/api/reports/wip');
+    },
+  
+    effectiveRate: (filters?: { dateFrom?: string; dateTo?: string }) => {
+      const params = new URLSearchParams();
+      if (filters?.dateFrom) params.set('dateFrom', filters.dateFrom);
+      if (filters?.dateTo) params.set('dateTo', filters.dateTo);
+      const qs = params.toString();
+      return apiClient<EffectiveRateReport[]>(`/api/reports/effective-rate${qs ? `?${qs}` : ''}`);
+    },
+  
+    techUtilization: (filters?: { dateFrom?: string; dateTo?: string }) => {
+      const params = new URLSearchParams();
+      if (filters?.dateFrom) params.set('dateFrom', filters.dateFrom);
+      if (filters?.dateTo) params.set('dateTo', filters.dateTo);
+      const qs = params.toString();
+      return apiClient<TechUtilizationReport[]>(`/api/reports/tech-utilization${qs ? `?${qs}` : ''}`);
+    },
+  
+    dateRange: (filters?: { dateFrom?: string; dateTo?: string; clientId?: string }) => {    const params = new URLSearchParams();
     if (filters?.dateFrom) params.set('dateFrom', filters.dateFrom);
     if (filters?.dateTo) params.set('dateTo', filters.dateTo);
     if (filters?.clientId) params.set('clientId', filters.clientId);
