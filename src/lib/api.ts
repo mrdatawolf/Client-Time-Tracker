@@ -794,9 +794,38 @@ export interface SyncStatus {
   state: 'idle' | 'syncing' | 'offline' | 'error' | 'disabled';
 }
 
+export interface SyncChangelogEntry {
+  id: number;
+  table_name: string;
+  record_id: string;
+  operation: 'INSERT' | 'UPDATE' | 'DELETE';
+  changed_at: string;
+  error_message: string | null;
+  last_attempt_at: string | null;
+}
+
+export interface SyncConflict {
+  changelogId: number;
+  tableName: string;
+  recordId: string;
+  operation: string;
+  errorMessage: string;
+  local: any;
+  remote: any;
+}
+
 export const supabaseSync = {
-  getConfig: () =>
-    apiClient<SupabaseConfig>('/api/supabase/config'),
+  getConfig: () => apiClient<SupabaseConfig>('/api/supabase/config'),
+
+  getChangelog: () => apiClient<SyncChangelogEntry[]>('/api/supabase/changelog'),
+
+  getConflicts: () => apiClient<SyncConflict[]>('/api/supabase/audit'),
+
+  resolveConflict: (changelogId: number, strategy: 'keep-local' | 'use-remote' | 'discard') =>
+    apiClient<{ success: boolean }>('/api/supabase/resolve-conflict', {
+      method: 'POST',
+      body: JSON.stringify({ changelogId, strategy }),
+    }),
 
   updateConfig: (data: Partial<SupabaseConfig>) =>
     apiClient<{ success: boolean; instanceId: string }>('/api/supabase/config', {

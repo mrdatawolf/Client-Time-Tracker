@@ -6,6 +6,8 @@ export interface ChangelogEntry {
   record_id: string;
   operation: 'INSERT' | 'UPDATE' | 'DELETE';
   changed_at: Date;
+  error_message?: string;
+  last_attempt_at?: Date;
 }
 
 /** Get all unsynced changelog entries, ordered by id (chronological) */
@@ -13,7 +15,7 @@ export async function getPendingChanges(): Promise<ChangelogEntry[]> {
   const db = await getLocalDb();
   const client = (db as any)._.session.client; // Access underlying PGlite client
   const result = await client.query(
-    `SELECT id, table_name, record_id, operation, changed_at
+    `SELECT id, table_name, record_id, operation, changed_at, error_message, last_attempt_at
      FROM sync_changelog
      WHERE synced = false
      ORDER BY id ASC`
@@ -38,8 +40,22 @@ export async function markSynced(ids: number[]): Promise<void> {
   const client = (db as any)._.session.client;
   const placeholders = ids.map((_, i) => `$${i + 1}`).join(', ');
   await client.query(
-    `UPDATE sync_changelog SET synced = true WHERE id IN (${placeholders})`,
+    `UPDATE sync_changelog 
+     SET synced = true, error_message = NULL, last_attempt_at = NOW() 
+     WHERE id IN (${placeholders})`,
     ids
+  );
+}
+
+/** Mark a changelog entry with an error */
+export async function markSyncError(id: number, message: string): Promise<void> {
+  const db = await getLocalDb();
+  const client = (db as any)._.session.client;
+  await client.query(
+    `UPDATE sync_changelog 
+     SET error_message = $1, last_attempt_at = NOW() 
+     WHERE id = $2`,
+    [message, id]
   );
 }
 
