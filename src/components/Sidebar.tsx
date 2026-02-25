@@ -186,7 +186,15 @@ export function Sidebar() {
             <SidebarSyncIndicator state={syncing ? 'syncing' : syncStatus.state} />
             {!collapsed && (
               <span className="text-xs text-gray-400 truncate flex-1">
-                {syncing ? 'Syncing...' : syncStatus.state === 'idle' ? 'Synced' : syncStatus.state === 'error' ? 'Sync error' : syncStatus.state === 'offline' ? 'Offline' : 'Syncing...'}
+                {syncing 
+                  ? 'Syncing...' 
+                  : syncStatus.state === 'idle' 
+                    ? `Synced${syncStatus.pendingCount > 0 ? ` (${syncStatus.pendingCount})` : ''}` 
+                    : syncStatus.state === 'error' 
+                      ? 'Sync error' 
+                      : syncStatus.state === 'offline' 
+                        ? 'Offline' 
+                        : 'Syncing...'}
               </span>
             )}
             <button

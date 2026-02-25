@@ -208,9 +208,11 @@ app.get('/status', requireAdmin(), async (c) => {
   if (config?.enabled) {
     try {
       const { getSyncStatus } = await import('@ctt/shared/db/sync-scheduler');
+      const { getPendingCount } = await import('@ctt/shared/db/sync-changelog');
       const status = getSyncStatus();
-      pendingCount = status.pendingCount;
       syncState = status.state;
+      // Get fresh count from DB instead of cached scheduler status
+      pendingCount = await getPendingCount();
     } catch {
       syncState = 'idle';
     }
@@ -223,6 +225,162 @@ app.get('/status', requireAdmin(), async (c) => {
     pendingCount,
     state: syncState,
   });
+});
+
+// Get detailed changelog (for sync audit/error debugging)
+app.get('/changelog', requireAdmin(), async (c) => {
+  try {
+    const { getPendingChanges } = await import('@ctt/shared/db/sync-changelog');
+    const entries = await getPendingChanges();
+    return c.json(entries);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return c.json({ error: message }, 500);
+  }
+});
+
+// GET /audit - Find conflicts and return side-by-side data
+app.get('/audit', requireAdmin(), async (c) => {
+  try {
+    const { getPendingChanges } = await import('@ctt/shared/db/sync-changelog');
+    const { getSupabasePool } = await import('@ctt/shared/db/supabase-client');
+    const { getLocalDb } = await import('@ctt/shared/db');
+    
+    const pending = await getPendingChanges();
+    const errors = pending.filter(e => e.error_message);
+    
+    if (errors.length === 0) return c.json([]);
+
+    const pool = await getSupabasePool();
+    const localDb = await getLocalDb();
+    const localClient = (localDb as any)._.session.client;
+
+    const conflicts = [];
+
+    for (const error of errors) {
+      // 1. Get Local Data
+      const localRes = await localClient.query(`SELECT * FROM ${error.table_name} WHERE id = $1`, [error.record_id]);
+      const localData = localRes.rows[0] || null;
+
+      // 2. Get Remote Data (Try by ID first, then by unique keys if it's a unique constraint error)
+      let remoteData = null;
+      const remoteById = await pool.query(`SELECT * FROM ${error.table_name} WHERE id = $1`, [error.record_id]);
+      
+      if (remoteById.rows.length > 0) {
+        remoteData = remoteById.rows[0];
+      } else if (error.error_message?.includes('unique constraint') || error.error_message?.includes('duplicate key')) {
+        // If it's a username conflict, find the remote user by username
+        if (error.table_name === 'users' && localData?.username) {
+          const remoteByUsername = await pool.query(`SELECT * FROM users WHERE username = $1`, [localData.username]);
+          remoteData = remoteByUsername.rows[0] || null;
+        }
+        // If it's an invoice number conflict
+        if (error.table_name === 'invoices' && localData?.invoice_number) {
+          const remoteByInv = await pool.query(`SELECT * FROM invoices WHERE invoice_number = $1`, [localData.invoice_number]);
+          remoteData = remoteByInv.rows[0] || null;
+        }
+      }
+
+      conflicts.push({
+        changelogId: error.id,
+        tableName: error.table_name,
+        recordId: error.record_id,
+        operation: error.operation,
+        errorMessage: error.error_message,
+        local: localData,
+        remote: remoteData
+      });
+    }
+
+    return c.json(conflicts);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return c.json({ error: message }, 500);
+  }
+});
+
+// POST /resolve-conflict - Manually resolve a sync conflict
+app.post('/resolve-conflict', requireAdmin(), async (c) => {
+  const body = await c.req.json() as { changelogId: number, strategy: 'keep-local' | 'use-remote' | 'discard' };
+  const { changelogId, strategy } = body;
+
+  try {
+    const { getLocalDb } = await import('@ctt/shared/db');
+    const { getSupabasePool } = await import('@ctt/shared/db/supabase-client');
+    const { markSynced } = await import('@ctt/shared/db/sync-changelog');
+    
+    const db = await getLocalDb();
+    const localClient = (db as any)._.session.client;
+    const pool = await getSupabasePool();
+
+    // Get the changelog entry
+    const entryRes = await localClient.query(`SELECT * FROM sync_changelog WHERE id = $1`, [changelogId]);
+    if (entryRes.rows.length === 0) return c.json({ error: 'Conflict entry not found' }, 404);
+    const entry = entryRes.rows[0];
+
+    if (strategy === 'discard') {
+      await markSynced([changelogId]);
+      return c.json({ success: true });
+    }
+
+    if (strategy === 'use-remote') {
+      // Pull remote data and overwrite local
+      const remoteRes = await pool.query(`SELECT * FROM ${entry.table_name} WHERE id = $1`, [entry.record_id]);
+      // If not found by ID, and it was a user conflict, try finding by username
+      let remoteData = remoteRes.rows[0];
+      
+      if (!remoteData && entry.table_name === 'users') {
+        const localUser = await localClient.query(`SELECT username FROM users WHERE id = $1`, [entry.record_id]);
+        if (localUser.rows[0]) {
+          const remoteUser = await pool.query(`SELECT * FROM users WHERE username = $1`, [localUser.rows[0].username]);
+          remoteData = remoteUser.rows[0];
+        }
+      }
+
+      if (remoteData) {
+        // To avoid FK issues if the ID changed, we might need to delete the "wrong" local one first
+        await localClient.transaction(async (tx: any) => {
+          await tx.query("SET LOCAL app.syncing = 'true'");
+          // If IDs are different, delete the local one that was conflicting
+          if (remoteData.id !== entry.record_id) {
+            await tx.query(`DELETE FROM ${entry.table_name} WHERE id = $1`, [entry.record_id]);
+          }
+          
+          // Upsert the remote version
+          const columns = Object.keys(remoteData);
+          const values = Object.values(remoteData);
+          const placeholders = values.map((_, i) => `$${i + 1}`).join(', ');
+          const updateParts = columns.filter(c => c !== 'id').map((c, i) => `${c} = $${i + 1}`);
+          
+          await tx.query(`
+            INSERT INTO ${entry.table_name} (${columns.join(', ')})
+            VALUES (${placeholders})
+            ON CONFLICT (id) DO UPDATE SET ${updateParts.join(', ')}
+          `, values);
+        });
+      }
+      
+      await markSynced([changelogId]);
+    } else if (strategy === 'keep-local') {
+      // Force push local to remote (already handled by the standard sync engine, 
+      // but we need to clear the error so it tries again without the conflict check)
+      await localClient.query(`UPDATE sync_changelog SET error_message = NULL WHERE id = $1`, [changelogId]);
+      
+      // We also need to "clean" the remote record if it's a unique constraint issue
+      if (entry.table_name === 'users') {
+        const localUser = await localClient.query(`SELECT username FROM users WHERE id = $1`, [entry.record_id]);
+        if (localUser.rows[0]) {
+          // Delete the remote user with the same name so our local one can take its place
+          await pool.query(`DELETE FROM users WHERE username = $1 AND id != $2`, [localUser.rows[0].username, entry.record_id]);
+        }
+      }
+    }
+
+    return c.json({ success: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return c.json({ error: message }, 500);
+  }
 });
 
 // Trigger manual sync

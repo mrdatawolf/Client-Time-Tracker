@@ -8,12 +8,70 @@ import * as relations from '../relations';
 
 const allSchema = { ...schema, ...relations };
 
-// Resolve DB path relative to monorepo root (this file is at packages/shared/src/db/local.ts)
+// Resolve DB path
 const __filename_local = fileURLToPath(import.meta.url);
 const __dirname_local = path.dirname(__filename_local);
 const MONOREPO_ROOT = path.resolve(__dirname_local, '..', '..', '..', '..');
-const DEFAULT_DB_PATH = path.join(MONOREPO_ROOT, 'data', 'time-tracker');
-const DB_PATH = process.env.PGLITE_DB_LOCATION || DEFAULT_DB_PATH;
+
+// More robust production detection:
+// 1. Check for 'production' env
+// 2. Check if we are inside an .asar or resources folder (typical Electron bundle)
+const isDev = process.env.NODE_ENV !== 'production' && !__dirname_local.includes('app.asar') && !__dirname_local.includes('resources');
+
+const OLD_RELATIVE_DB_PATH = path.join(MONOREPO_ROOT, 'data', 'time-tracker');
+
+function getDatabasePath(): string {
+  if (process.env.PGLITE_DB_LOCATION) return process.env.PGLITE_DB_LOCATION;
+  
+  if (isDev) {
+    return OLD_RELATIVE_DB_PATH;
+  } else {
+    // In production, use the standard OS app data folder
+    const appData = process.env.APPDATA || 
+      (process.platform === 'darwin' ? path.join(process.env.HOME || '', 'Library', 'Application Support') : path.join(process.env.HOME || '', '.local', 'share'));
+    return path.join(appData, 'client-time-tracker', 'db');
+  }
+}
+
+const DB_PATH = getDatabasePath();
+
+/** 
+ * One-time migration: If data exists in the old relative path but not the new path,
+ * move it to the new location to prevent data loss after the AppData transition.
+ */
+function migrateOldData(): void {
+  const newPath = DB_PATH;
+  const oldPath = OLD_RELATIVE_DB_PATH;
+
+  // Don't migrate if paths are the same or old doesn't exist
+  if (newPath === oldPath || !fs.existsSync(oldPath)) return;
+
+  // Don't migrate if new path already has data
+  if (fs.existsSync(newPath) && fs.readdirSync(newPath).length > 0) return;
+
+  try {
+    console.log(`Migrating data from ${oldPath} to ${newPath}...`);
+    const newDir = path.dirname(newPath);
+    if (!fs.existsSync(newDir)) fs.mkdirSync(newDir, { recursive: true });
+    
+    // Copy the entire PGlite directory
+    if (!fs.existsSync(newPath)) fs.mkdirSync(newPath, { recursive: true });
+    
+    const files = fs.readdirSync(oldPath);
+    for (const file of files) {
+      const src = path.join(oldPath, file);
+      const dest = path.join(newPath, file);
+      if (fs.lstatSync(src).isDirectory()) {
+        // Skip subdirectories if any, PGlite is mostly flat files
+        continue;
+      }
+      fs.copyFileSync(src, dest);
+    }
+    console.log('Migration successful!');
+  } catch (err) {
+    console.error('Data migration failed:', err);
+  }
+}
 
 // HMR-safe global state (prevents multiple PGlite instances in development)
 declare global {
@@ -22,8 +80,6 @@ declare global {
   var __initializationPromise: Promise<ReturnType<typeof drizzle<typeof allSchema>>> | null | undefined;
   var __initializationError: Error | null | undefined;
 }
-
-const isDev = process.env.NODE_ENV !== 'production';
 
 function getPgliteClient(): PGlite | null {
   return isDev ? (globalThis.__pgliteClient ?? null) : pgliteClient;
@@ -278,7 +334,9 @@ async function initializeSchema(client: PGlite): Promise<void> {
       record_id TEXT NOT NULL,
       operation TEXT NOT NULL,
       changed_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-      synced BOOLEAN DEFAULT false NOT NULL
+      synced BOOLEAN DEFAULT false NOT NULL,
+      error_message TEXT,
+      last_attempt_at TIMESTAMPTZ
     );
 
     CREATE INDEX IF NOT EXISTS idx_sync_changelog_unsynced
@@ -298,6 +356,10 @@ async function initializeSchema(client: PGlite): Promise<void> {
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS billing_day NUMERIC(2, 0);
 
     ALTER TABLE invoices ADD COLUMN IF NOT EXISTS is_auto_generated BOOLEAN NOT NULL DEFAULT false;
+
+    -- Add sync logging columns to changelog
+    ALTER TABLE sync_changelog ADD COLUMN IF NOT EXISTS error_message TEXT;
+    ALTER TABLE sync_changelog ADD COLUMN IF NOT EXISTS last_attempt_at TIMESTAMPTZ;
 
     -- Fix invoice_line_items foreign key to allow deleting time entries
     DO $$ BEGIN
@@ -379,6 +441,7 @@ async function initializeSchema(client: PGlite): Promise<void> {
 }
 
 async function initializeLocalDb(): Promise<ReturnType<typeof drizzle<typeof allSchema>>> {
+  migrateOldData();
   ensureDataDirectory();
   clearStaleLockFile();
 

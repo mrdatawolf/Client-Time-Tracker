@@ -187,6 +187,11 @@ export async function pushChanges(): Promise<{ pushed: number; skipped: number; 
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`Sync push error for ${entry.table_name}:${entry.record_id}:`, message);
+      
+      // Log the error to the changelog so it's visible in the UI
+      const { markSyncError } = await import('./sync-changelog');
+      await markSyncError(entry.id, message);
+      
       errors.push({ message: `[${entry.table_name}] ${message}`, entry });
       skipped++;
     }
@@ -415,8 +420,9 @@ export interface InitialSyncResult {
 
 /** Run initial sync in the specified direction */
 export async function runInitialSync(direction: 'push' | 'pull' | 'merge'): Promise<InitialSyncResult> {
-  const pool = await getSupabasePool();
+  // Ensure local DB is ready and schema is initialized
   const localDb = await getLocalDb();
+  const pool = await getSupabasePool();
   const localClient = (localDb as any)._.session.client;
 
   let totalPushed = 0;
@@ -552,9 +558,25 @@ async function upsertToRemote(pool: any, tableName: string, record: Record<strin
     }
   }
 
+  // Handle specific unique constraint conflicts
+  if (tableName === 'users' && record.username) {
+    // If username exists on remote with a different ID, we should ideally merge.
+    // To resolve the immediate sync error, we'll ensure the remote record with this username
+    // is updated to our local ID (if no other records point to the remote ID yet)
+    // or we'll simply update our local ID to match remote (handled in a separate step).
+    // For now, we use a custom conflict target for users.
+    const userSql = `
+      INSERT INTO users (${columns.join(', ')})
+      VALUES (${placeholders.join(', ')})
+      ON CONFLICT (username) DO UPDATE SET 
+        id = EXCLUDED.id,
+        ${updateParts.filter(p => !p.startsWith('username =')).join(', ')}
+    `;
+    await pool.query(userSql, values);
+    return;
+  }
+
   // For invoices, handle the unique invoice_number constraint:
-  // If a different row already has this invoice_number, update that row's invoice_number
-  // to allow our upsert to proceed (the ON CONFLICT id will then set the correct value).
   if (tableName === 'invoices' && record.invoice_number) {
     await pool.query(
       `UPDATE invoices SET invoice_number = invoice_number || '_dup_' || id

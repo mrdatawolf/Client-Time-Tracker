@@ -260,7 +260,7 @@ route.put('/:id', async (c) => {
     return c.json({ error: 'Forbidden' }, 403);
   }
 
-  const { clientId, jobTypeId, rateTierId, date, hours, notes, isBilled, isPaid, groupId } = body;
+  const { clientId, techId, jobTypeId, rateTierId, date, hours, notes, isBilled, isPaid, groupId } = body;
 
   const updateData: Record<string, unknown> = { updatedAt: new Date() };
   if (clientId !== undefined) updateData.clientId = clientId;
@@ -271,8 +271,9 @@ route.put('/:id', async (c) => {
   if (notes !== undefined) updateData.notes = notes;
   if (groupId !== undefined) updateData.groupId = groupId;
 
-  // Only admins+ can change billing status
+  // Only admins+ can change technician or billing status
   if (isAtLeastAdmin(role)) {
+    if (techId !== undefined) updateData.techId = techId;
     if (isBilled !== undefined) updateData.isBilled = isBilled;
     if (isPaid !== undefined) updateData.isPaid = isPaid;
   }
