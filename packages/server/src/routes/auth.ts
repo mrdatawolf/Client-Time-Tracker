@@ -19,7 +19,7 @@ route.post('/login', async (c) => {
 
   const db = await getDb();
   const user = await db.query.users.findFirst({
-    where: eq(users.username, username),
+    where: eq(users.username, username.trim().toLowerCase()),
   });
 
   if (!user || !user.isActive) {
@@ -164,7 +164,7 @@ route.post('/setup', async (c) => {
 
   const passwordHash = await hashPassword(password);
   const [newUser] = await db.insert(users).values({
-    username: username.trim(),
+    username: username.trim().toLowerCase(),
     displayName: displayName.trim(),
     passwordHash,
     role: 'partner',

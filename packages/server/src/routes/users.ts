@@ -43,8 +43,10 @@ route.post('/', async (c) => {
     return c.json({ error: 'Only partners can create partner-role users' }, 403);
   }
 
+  const normalizedUsername = username.trim().toLowerCase();
+
   const existing = await db.query.users.findFirst({
-    where: eq(users.username, username),
+    where: eq(users.username, normalizedUsername),
   });
   if (existing) {
     return c.json({ error: 'Username already exists' }, 409);
@@ -52,7 +54,7 @@ route.post('/', async (c) => {
 
   const passwordHash = await hashPassword(password);
   const [user] = await db.insert(users).values({
-    username,
+    username: normalizedUsername,
     displayName,
     passwordHash,
     role: role || 'basic',
