@@ -108,6 +108,19 @@ function main() {
     console.log(`  -> ${DISTRIBUTE_SERVER_DIR}`);
   }
 
+  // Copy Linux setup helper
+  const setupHelper = path.join(ROOT_DIR, 'scripts', 'setup-linux.sh');
+  if (fs.existsSync(setupHelper)) {
+    if (!fs.existsSync(DISTRIBUTE_DIR)) fs.mkdirSync(DISTRIBUTE_DIR, { recursive: true });
+    if (!fs.existsSync(DISTRIBUTE_SERVER_DIR)) fs.mkdirSync(DISTRIBUTE_SERVER_DIR, { recursive: true });
+
+    fs.copyFileSync(setupHelper, path.join(DISTRIBUTE_DIR, 'setup-linux.sh'));
+    fs.copyFileSync(setupHelper, path.join(DISTRIBUTE_SERVER_DIR, 'setup-linux.sh'));
+    console.log('Linux Setup Helper: setup-linux.sh');
+    console.log(`  -> ${DISTRIBUTE_DIR}`);
+    console.log(`  -> ${DISTRIBUTE_SERVER_DIR}`);
+  }
+
   console.log('');
   console.log('========================================');
   console.log('  Distribution complete!');

@@ -104,15 +104,5 @@
         "Comment": "Time tracking application for client billing"
       }
     }
-  },
-  "rpm": {
-    "depends": [
-      "nodejs >= 20"
-    ]
-  },
-  "deb": {
-    "depends": [
-      "nodejs (>= 20)"
-    ]
   }
 }
