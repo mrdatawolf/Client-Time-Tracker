@@ -122,12 +122,26 @@ fi
 # Reload systemd
 systemctl daemon-reload
 
+# Check for Node.js and provide guidance if missing or old
+NODE_VER=$(node -v 2>/dev/null | cut -d'v' -f2 | cut -d'.' -f1)
+if [ -z "$NODE_VER" ]; then
+  echo ""
+  echo "WARNING: Node.js is not found in PATH."
+  echo "This server requires Node.js 20 or newer to run."
+  echo "Please install it using your package manager (e.g., 'sudo apt install nodejs' or 'sudo dnf install nodejs')."
+elif [ "$NODE_VER" -lt 20 ]; then
+  echo ""
+  echo "WARNING: Found Node.js v$(node -v), but version 20 or newer is required."
+  echo "The server may fail to start."
+fi
+
 echo ""
 echo "========================================"
 echo "  Client Time Tracker Server installed!"
 echo "========================================"
 echo ""
-echo "  Start:   sudo systemctl start client-time-tracker"
+echo "  Command: client-time-tracker-server"
+echo "  Service: sudo systemctl start client-time-tracker"
 echo "  Enable:  sudo systemctl enable client-time-tracker"
 echo "  Config:  ${CONFIG_DIR}/.env"
 echo "  Data:    ${DATA_DIR}/"
@@ -135,7 +149,20 @@ echo "  Logs:    journalctl -u client-time-tracker"
 echo ""
 echo "  Web UI:  http://localhost:3700"
 echo "  API:     http://localhost:3701"
+echo "========================================"
 echo ""
+`;
+}
+
+function createPreInstallScript() {
+  return `#!/bin/bash
+# Check for Node.js 20+
+if command -v node >/dev/null 2>&1; then
+  NODE_VER=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
+  if [ "$NODE_VER" -lt 20 ]; then
+    echo "Warning: Node.js version 20 or higher is recommended (found v$(node -v))."
+  fi
+fi
 `;
 }
 
@@ -319,6 +346,7 @@ function buildPackage(format, version) {
     `--maintainer "Lost Coast IT"`,
     depFlag,
     configFlag,
+    `--before-install ${path.join(STAGING_DIR, 'scripts', 'pre-install.sh')}`,
     `--after-install ${path.join(STAGING_DIR, 'scripts', 'post-install.sh')}`,
     `--before-remove ${path.join(STAGING_DIR, 'scripts', 'pre-uninstall.sh')}`,
     `--after-remove ${path.join(STAGING_DIR, 'scripts', 'post-uninstall.sh')}`,
@@ -403,12 +431,14 @@ async function build() {
   // Create FHS directory structure
   const rootDir = path.join(STAGING_DIR, 'root');
   const appDir = path.join(rootDir, 'opt', 'client-time-tracker');
+  const binDir = path.join(rootDir, 'usr', 'bin');
   const configDir = path.join(rootDir, 'etc', 'client-time-tracker');
   const systemdDir = path.join(rootDir, 'usr', 'lib', 'systemd', 'system');
   const dataDir = path.join(rootDir, 'var', 'lib', 'client-time-tracker', 'time-tracker');
   const scriptsDir = path.join(STAGING_DIR, 'scripts');
 
   fs.mkdirSync(appDir, { recursive: true });
+  fs.mkdirSync(binDir, { recursive: true });
   fs.mkdirSync(configDir, { recursive: true });
   fs.mkdirSync(systemdDir, { recursive: true });
   fs.mkdirSync(dataDir, { recursive: true });
@@ -417,6 +447,15 @@ async function build() {
   // Copy dist-server contents to /opt/client-time-tracker/
   console.log('Copying server files...');
   copyDir(DIST_SERVER_DIR, appDir);
+
+  // Create symlink in /usr/bin/
+  console.log('Creating symlink in /usr/bin...');
+  try {
+    // Relative symlink for the package: /usr/bin/x -> ../../opt/client-time-tracker/start-server.sh
+    fs.symlinkSync('../../opt/client-time-tracker/start-server.sh', path.join(binDir, 'client-time-tracker-server'));
+  } catch (err) {
+    console.warn('Warning: Could not create symlink:', err.message);
+  }
 
   // Move .env to /etc/client-time-tracker/ and symlink it
   const appEnvPath = path.join(appDir, '.env');
@@ -446,9 +485,11 @@ async function build() {
 
   // Create package scripts
   console.log('Creating package scripts...');
+  fs.writeFileSync(path.join(scriptsDir, 'pre-install.sh'), createPreInstallScript());
   fs.writeFileSync(path.join(scriptsDir, 'post-install.sh'), createPostInstallScript());
   fs.writeFileSync(path.join(scriptsDir, 'pre-uninstall.sh'), createPreUninstallScript());
   fs.writeFileSync(path.join(scriptsDir, 'post-uninstall.sh'), createPostUninstallScript());
+  fs.chmodSync(path.join(scriptsDir, 'pre-install.sh'), 0o755);
   fs.chmodSync(path.join(scriptsDir, 'post-install.sh'), 0o755);
   fs.chmodSync(path.join(scriptsDir, 'pre-uninstall.sh'), 0o755);
   fs.chmodSync(path.join(scriptsDir, 'post-uninstall.sh'), 0o755);
