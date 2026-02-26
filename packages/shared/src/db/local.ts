@@ -156,7 +156,7 @@ function clearStaleLockFile(): boolean {
   }
 }
 
-async function initializeSchema(client: PGlite): Promise<void> {
+export async function initializeSchema(client: PGlite): Promise<void> {
   // 1. Create Enums and Extensions
   await client.exec(`
     DO $$ BEGIN
@@ -536,6 +536,11 @@ export function resetDbError(): void {
 
 export function isDbInitialized(): boolean {
   return getLocalDbInstanceInternal() !== null && getInitError() === null;
+}
+
+/** Get the raw PGlite client (for running migrations outside of init) */
+export function getPgliteClientInstance(): PGlite | null {
+  return getPgliteClient();
 }
 
 export { allSchema as schema };
