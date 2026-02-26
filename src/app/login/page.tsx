@@ -197,7 +197,7 @@ export default function LoginPage() {
                       id="setup-username"
                       type="text"
                       value={setupUsername}
-                      onChange={(e) => setSetupUsername(e.target.value.toLowerCase)}
+                      onChange={(e) => setSetupUsername(e.target.value.toLowerCase())}
                       placeholder="Choose a username"
                       required
                       autoFocus

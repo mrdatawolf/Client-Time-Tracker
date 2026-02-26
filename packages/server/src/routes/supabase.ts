@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import dns from 'dns/promises';
 import crypto from 'crypto';
-import { requireAdmin } from '../middleware/auth';
+import { requireAdmin, requireAdminOrSetup } from '../middleware/auth';
 import type { AppEnv } from '../types';
 import {
   loadSupabaseConfig,
@@ -58,8 +58,8 @@ app.get('/config', requireAdmin(), async (c) => {
   });
 });
 
-// Update Supabase config
-app.put('/config', requireAdmin(), async (c) => {
+// Update Supabase config (allows unauthenticated access during fresh install)
+app.put('/config', requireAdminOrSetup(), async (c) => {
   const body = await c.req.json() as Partial<SupabaseConfig>;
 
   // Don't allow overwriting keys with masked values
@@ -109,8 +109,8 @@ app.post('/config/export', requireAdmin(), async (c) => {
   return c.json({ exportString });
 });
 
-// Import config from encrypted string
-app.post('/config/import', requireAdmin(), async (c) => {
+// Import config from encrypted string (allows unauthenticated access during fresh install)
+app.post('/config/import', requireAdminOrSetup(), async (c) => {
   const { exportString } = await c.req.json() as { exportString: string };
 
   if (!exportString || !exportString.startsWith('CTT:')) {
@@ -170,8 +170,8 @@ app.post('/test-connection', requireAdmin(), async (c) => {
   }
 });
 
-// Setup schema on Supabase (creates tables if they don't exist)
-app.post('/setup-schema', requireAdmin(), async (c) => {
+// Setup schema on Supabase (allows unauthenticated access during fresh install)
+app.post('/setup-schema', requireAdminOrSetup(), async (c) => {
   const config = loadSupabaseConfig();
 
   if (!config?.databaseUrl) {
@@ -405,8 +405,8 @@ app.post('/sync', requireAdmin(), async (c) => {
   }
 });
 
-// Initial sync (full push/pull/merge)
-app.post('/initial-sync', requireAdmin(), async (c) => {
+// Initial sync (allows unauthenticated access during fresh install)
+app.post('/initial-sync', requireAdminOrSetup(), async (c) => {
   const config = loadSupabaseConfig();
 
   if (!config?.databaseUrl) {

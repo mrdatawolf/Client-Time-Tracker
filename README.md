@@ -102,12 +102,12 @@ On first launch, you'll be prompted to create an admin account.
 
 ## Building & Packaging
 
-The app can be distributed as a standalone server (with systemd integration on Linux) or as an Electron desktop app.
+The app can be distributed as a standalone server (with systemd integration on Linux) or as an Electron desktop app. **You must build on the target platform** — use `build:all` on Windows and `build:linux` on Linux.
 
 ### Windows
 
 ```bash
-# Full build pipeline (Next.js + API bundle + Electron installer + NSIS server installer)
+# Full Windows build pipeline (Next.js + API bundle + Electron .exe + NSIS server installer)
 pnpm build:all
 ```
 
@@ -120,13 +120,15 @@ pnpm build:all
 ### Linux
 
 ```bash
-# Full Linux build pipeline (Next.js + API bundle + Electron + RPM/DEB packages)
+# Full Linux build pipeline (Next.js + API bundle + Electron .deb/.rpm + server .deb/.rpm)
 pnpm build:linux
 ```
 
 **Output:**
 - `distribute/` — Electron desktop packages (`.rpm`, `.deb`)
 - `distribute_server/` — Standalone server packages (`.rpm`, `.deb`)
+
+**Note:** `build:all` is Windows-only (builds NSIS installers). On Linux, always use `build:linux` — it builds native `.deb` and `.rpm` packages for both the desktop client and standalone server.
 
 **Requires:** `fpm` and platform build tools. The build script checks prerequisites and tells you exactly what to install:
 

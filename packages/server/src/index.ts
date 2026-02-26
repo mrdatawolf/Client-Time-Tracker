@@ -50,9 +50,9 @@ app.get('/health', (c) => {
 // Auth routes (login is public, /me and /change-password use their own auth)
 app.route('/api/auth', authRoutes);
 
-// Auth middleware for all /api/* routes except auth routes (which handle their own auth)
+// Auth middleware for all /api/* routes except auth and supabase routes (which handle their own auth)
 app.use('/api/*', async (c, next) => {
-  if (c.req.path.startsWith('/api/auth')) {
+  if (c.req.path.startsWith('/api/auth') || c.req.path.startsWith('/api/supabase')) {
     return next();
   }
   return requireAuth()(c, next);
