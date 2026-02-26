@@ -19,8 +19,7 @@ import {
   FolderKanban,
   RefreshCw,
   Wifi,
-  WifiOff,
-  AlertCircle,
+  Ban,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { clearToken, getUser } from '@/lib/api-client';
@@ -246,9 +245,8 @@ function SidebarSyncIndicator({ state }: { state: string }) {
     case 'syncing':
       return <RefreshCw className="w-3.5 h-3.5 text-blue-400 animate-spin shrink-0" />;
     case 'offline':
-      return <WifiOff className="w-3.5 h-3.5 text-orange-400 shrink-0" />;
     case 'error':
-      return <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />;
+      return <Ban className="w-3.5 h-3.5 text-red-400 shrink-0" />;
     default:
       return null;
   }

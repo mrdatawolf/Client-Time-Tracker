@@ -54,6 +54,15 @@ async function ensurePool(): Promise<pg.Pool> {
     max: 5,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
+    // Kill queries that hang longer than 15 seconds (e.g., on dead TCP connections)
+    statement_timeout: 15000,
+    // Close idle connections that may have become stale
+    allowExitOnIdle: true,
+  });
+
+  // Handle pool-level errors (e.g., lost connections) to prevent unhandled exceptions
+  pool.on('error', (err) => {
+    console.error('[Supabase Pool] Unexpected error on idle client:', err.message);
   });
 
   return pool;
