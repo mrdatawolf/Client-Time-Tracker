@@ -906,4 +906,7 @@ export const database = {
 
   restore: (name: string) =>
     apiClient<{ success: boolean; message: string }>(`/api/database/restore/${encodeURIComponent(name)}`, { method: 'POST' }),
+
+  runMigrations: () =>
+    apiClient<{ success: boolean; message: string }>('/api/database/run-migrations', { method: 'POST' }),
 };

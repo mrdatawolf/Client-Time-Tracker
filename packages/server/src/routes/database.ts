@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import fs from 'fs';
 import path from 'path';
 import { requireAdmin } from '../middleware/auth';
-import { getDbPath, closeLocalDb, resetDbError } from '@ctt/shared/db';
+import { getDbPath, closeLocalDb, resetDbError, initializeSchema, getPgliteClientInstance } from '@ctt/shared/db';
 import type { AppEnv } from '../types';
 
 const app = new Hono<AppEnv>();
@@ -175,6 +175,22 @@ app.post('/restore/:name', requireAdmin(), async (c) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return c.json({ error: `Restore failed: ${message}` }, 500);
+  }
+});
+
+// Run database migrations (re-applies all schema migrations)
+app.post('/run-migrations', requireAdmin(), async (c) => {
+  try {
+    const client = getPgliteClientInstance();
+    if (!client) {
+      return c.json({ success: false, message: 'Database is not initialized. Try restarting the server.' }, 400);
+    }
+
+    await initializeSchema(client);
+    return c.json({ success: true, message: 'All migrations applied successfully.' });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return c.json({ success: false, message: `Migration failed: ${message}` }, 500);
   }
 });
 

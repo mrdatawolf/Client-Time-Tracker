@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Settings, Users, Briefcase, DollarSign, Plus, Pencil, Trash2, Key, Cloud, HardDrive, Download, RotateCcw, AlertTriangle, Loader2 } from 'lucide-react';
+import { Settings, Users, Briefcase, DollarSign, Plus, Pencil, Trash2, Key, Cloud, HardDrive, Download, RotateCcw, AlertTriangle, Loader2, CheckCircle, XCircle, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -771,6 +771,10 @@ function DatabaseTab() {
   const [showRestoreDialog, setShowRestoreDialog] = useState(false);
   const [restoreTarget, setRestoreTarget] = useState<string | null>(null);
 
+  // Migrations
+  const [runningMigrations, setRunningMigrations] = useState(false);
+  const [migrationResult, setMigrationResult] = useState<{ success: boolean; message: string } | null>(null);
+
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const loadData = useCallback(async () => {
@@ -851,6 +855,19 @@ function DatabaseTab() {
     }
   }
 
+  async function handleRunMigrations() {
+    setRunningMigrations(true);
+    setMigrationResult(null);
+    try {
+      const result = await databaseApi.runMigrations();
+      setMigrationResult(result);
+    } catch (err) {
+      setMigrationResult({ success: false, message: err instanceof Error ? err.message : 'Migration failed' });
+    } finally {
+      setRunningMigrations(false);
+    }
+  }
+
   function formatBackupDate(dateStr: string) {
     try {
       return new Date(dateStr).toLocaleString();
@@ -890,6 +907,32 @@ function DatabaseTab() {
             <span className="text-gray-900 dark:text-gray-100">{dbSize} MB</span>
           </div>
         </div>
+      </div>
+
+      {/* Migrations */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2 flex items-center gap-2">
+          <Wrench className="w-5 h-5" />
+          Migrations
+        </h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+          Re-apply all database schema migrations. Use this if you&apos;re experiencing errors after an update.
+        </p>
+        <Button onClick={handleRunMigrations} disabled={runningMigrations} size="sm">
+          {runningMigrations ? (
+            <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Running...</>
+          ) : (
+            <><Wrench className="w-4 h-4 mr-1" /> Run Migrations</>
+          )}
+        </Button>
+        {migrationResult && (
+          <div className={`mt-3 flex items-start gap-2 text-sm ${
+            migrationResult.success ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'
+          }`}>
+            {migrationResult.success ? <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" /> : <XCircle className="w-4 h-4 mt-0.5 shrink-0" />}
+            <span>{migrationResult.message}</span>
+          </div>
+        )}
       </div>
 
       {/* Backups */}

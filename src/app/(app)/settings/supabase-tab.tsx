@@ -426,7 +426,7 @@ export default function SupabaseTab() {
 
               <div>
                 <Button variant="outline" size="sm" className="w-full justify-start h-9" onClick={handleSetupSchema} disabled={settingUpSchema || !config?.databaseUrl}>
-                  <Database className="w-4 h-4 mr-2" /> {settingUpSchema ? 'Setting up...' : 'Verify Schema'}
+                  <Database className="w-4 h-4 mr-2" /> {settingUpSchema ? 'Running...' : 'Run Migrations'}
                 </Button>
                 {schemaResult && (
                   <div className={`mt-2 flex items-start gap-1.5 text-[11px] ${schemaResult.success ? 'text-green-600' : 'text-red-600'}`}>
