@@ -107,11 +107,16 @@ serve({
 }, (info) => {
   console.log(`Time Tracker API running at http://${hostname}:${info.port}`);
 
-  // Start Supabase sync scheduler (no-op if not configured)
-  startSyncScheduler();
+  // Skip background schedulers in demo mode (ephemeral in-memory DB)
+  if (process.env.DEMO_MODE !== 'true') {
+    // Start Supabase sync scheduler (no-op if not configured)
+    startSyncScheduler();
 
-  // Start auto-invoice scheduler (checks hourly for clients with billing cycles)
-  startAutoInvoiceScheduler();
+    // Start auto-invoice scheduler (checks hourly for clients with billing cycles)
+    startAutoInvoiceScheduler();
+  } else {
+    console.log('[Demo] Skipping sync and auto-invoice schedulers');
+  }
 });
 
 export default app;

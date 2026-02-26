@@ -1,13 +1,13 @@
 {
   "name": "client-time-tracker",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "private": true,
   "packageManager": "pnpm@10.28.2",
   "scripts": {
     "dev": "next dev --port 3700",
     "dev:server": "pnpm --filter @ctt/server dev",
     "dev:all": "node scripts/dev.js",
-    "dev:all:demo": "DEMO_MODE=true NEXT_PUBLIC_DEMO_MODE=true node scripts/dev.js",
+    "dev:all:demo": "node -e \"const fs=require('fs'); if(!fs.existsSync('.env.local')){fs.writeFileSync('.env.local','JWT_SECRET=ctt-demo-secret\\nAPI_PORT=3701\\nNEXT_PUBLIC_API_URL=http://localhost:3701\\n');console.log('Created .env.local with defaults')}\" && DEMO_MODE=true NEXT_PUBLIC_DEMO_MODE=true node scripts/dev.js",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
