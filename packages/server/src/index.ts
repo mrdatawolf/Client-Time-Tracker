@@ -50,9 +50,18 @@ app.get('/health', (c) => {
 // Auth routes (login is public, /me and /change-password use their own auth)
 app.route('/api/auth', authRoutes);
 
-// Auth middleware for all /api/* routes except auth and supabase routes (which handle their own auth)
+// Auth middleware for all /api/* routes except those that handle their own auth.
+// Auth routes are fully public. Specific supabase routes use requireAdminOrSetup()
+// which handles its own token extraction, allowing unauthenticated access during
+// fresh install (no users in DB). All other supabase routes need global auth.
+const SUPABASE_SETUP_PATHS = ['/api/supabase/config/import', '/api/supabase/config', '/api/supabase/setup-schema', '/api/supabase/initial-sync'];
 app.use('/api/*', async (c, next) => {
-  if (c.req.path.startsWith('/api/auth') || c.req.path.startsWith('/api/supabase')) {
+  if (c.req.path.startsWith('/api/auth')) {
+    return next();
+  }
+  // Skip global auth for supabase routes that support fresh-install access
+  // (they use requireAdminOrSetup which extracts tokens internally)
+  if (SUPABASE_SETUP_PATHS.includes(c.req.path)) {
     return next();
   }
   return requireAuth()(c, next);

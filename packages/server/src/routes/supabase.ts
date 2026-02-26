@@ -35,7 +35,7 @@ async function resolveConnectionString(connStr: string): Promise<string> {
 const app = new Hono<AppEnv>();
 
 // Get Supabase config (keys masked for display)
-app.get('/config', requireAdmin(), async (c) => {
+app.get('/config', requireAdminOrSetup(), async (c) => {
   const config = loadSupabaseConfig();
 
   if (!config) {
@@ -80,6 +80,16 @@ app.put('/config', requireAdminOrSetup(), async (c) => {
   delete body.lastSyncAt;
 
   const saved = saveSupabaseConfig(body);
+
+  // Restart the sync scheduler so config changes take effect immediately
+  // (e.g. enabling sync after fresh install import, or toggling enabled)
+  try {
+    const { restartSyncScheduler } = await import('@ctt/shared/db/sync-scheduler');
+    restartSyncScheduler();
+  } catch {
+    // Scheduler may not be available in all contexts
+  }
+
   return c.json({ success: true, instanceId: saved.instanceId });
 });
 

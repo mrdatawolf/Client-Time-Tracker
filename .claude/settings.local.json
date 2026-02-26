@@ -14,7 +14,8 @@
       "mcp__MCP_DOCKER__browser_network_requests",
       "mcp__MCP_DOCKER__browser_evaluate",
       "mcp__MCP_DOCKER__browser_fill_form",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(pnpm build:server)"
     ]
   }
 }
