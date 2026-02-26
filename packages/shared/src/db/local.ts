@@ -355,6 +355,8 @@ async function initializeSchema(client: PGlite): Promise<void> {
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS billing_cycle TEXT;
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS billing_day NUMERIC(2, 0);
 
+    ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS group_id UUID;
+
     ALTER TABLE invoices ADD COLUMN IF NOT EXISTS is_auto_generated BOOLEAN NOT NULL DEFAULT false;
 
     -- Add sync logging columns to changelog

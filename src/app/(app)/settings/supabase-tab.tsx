@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, CheckCircle, XCircle, AlertCircle, Wifi, WifiOff, Database, History, Info, Clock, ShieldAlert } from 'lucide-react';
+import { RefreshCw, CheckCircle, XCircle, AlertCircle, Wifi, Ban, Database, History, Info, Clock, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -497,8 +497,8 @@ function SyncStateIndicator({ state }: { state: string }) {
   switch (state) {
     case 'idle': return <span className="flex items-center gap-1.5 text-sm text-green-600"><Wifi className="w-4 h-4" /> Connected</span>;
     case 'syncing': return <span className="flex items-center gap-1.5 text-sm text-blue-600"><RefreshCw className="w-4 h-4 animate-spin" /> Syncing...</span>;
-    case 'offline': return <span className="flex items-center gap-1.5 text-sm text-orange-600"><WifiOff className="w-4 h-4" /> Offline</span>;
-    case 'error': return <span className="flex items-center gap-1.5 text-sm text-red-600"><AlertCircle className="w-4 h-4" /> Error</span>;
+    case 'offline': return <span className="flex items-center gap-1.5 text-sm text-red-600"><Ban className="w-4 h-4" /> Offline</span>;
+    case 'error': return <span className="flex items-center gap-1.5 text-sm text-red-600"><Ban className="w-4 h-4" /> Error</span>;
     default: return <span className="flex items-center gap-1.5 text-sm text-gray-500">Disabled</span>;
   }
 }

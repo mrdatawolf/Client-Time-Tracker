@@ -1,6 +1,7 @@
 import { isSupabaseEnabled } from './supabase-config';
 import { getPendingCount } from './sync-changelog';
 import { runSyncCycle } from './sync-engine';
+import { resetSupabaseConnection } from './supabase-client';
 
 export type SyncState = 'idle' | 'syncing' | 'offline' | 'error' | 'disabled';
 
@@ -13,6 +14,7 @@ interface SyncStatus {
 
 const DEFAULT_INTERVAL = 30_000; // 30 seconds
 const MAX_BACKOFF = 300_000; // 5 minutes
+const POOL_RESET_THRESHOLD = 2; // Reset pool after this many consecutive failures
 
 let intervalHandle: ReturnType<typeof setInterval> | null = null;
 let currentInterval = DEFAULT_INTERVAL;
@@ -49,7 +51,9 @@ export function startSyncScheduler(intervalMs: number = DEFAULT_INTERVAL): void 
   // Run first sync immediately (don't wait for it here)
   runSyncTick().catch(() => {});
 
-  intervalHandle = setInterval(runSyncTick, currentInterval);
+  intervalHandle = setInterval(() => {
+    runSyncTick().catch(() => {});
+  }, currentInterval);
 }
 
 /** Stop the sync scheduler */
@@ -99,7 +103,7 @@ async function runSyncTick(): Promise<any> {
 
       // Success (possibly with partial errors): reset backoff
       status.state = result.pushErrors > 0 || result.pullErrors > 0 ? 'error' : 'idle';
-      status.lastError = result.pushErrors > 0 || result.pullErrors > 0 
+      status.lastError = result.pushErrors > 0 || result.pullErrors > 0
         ? `Sync complete with ${result.pushErrors + result.pullErrors} errors.`
         : null;
       status.consecutiveFailures = 0;
@@ -113,7 +117,9 @@ async function runSyncTick(): Promise<any> {
       if (currentInterval !== DEFAULT_INTERVAL && intervalHandle) {
         clearInterval(intervalHandle);
         currentInterval = DEFAULT_INTERVAL;
-        intervalHandle = setInterval(runSyncTick, currentInterval);
+        intervalHandle = setInterval(() => {
+          runSyncTick().catch(() => {});
+        }, currentInterval);
       }
       return result;
     } catch (error) {
@@ -125,13 +131,28 @@ async function runSyncTick(): Promise<any> {
         message.includes('ETIMEDOUT') ||
         message.includes('getaddrinfo') ||
         message.includes('connect ECONNRESET') ||
-        message.includes('Connection terminated unexpectedly');
+        message.includes('ECONNRESET') ||
+        message.includes('Connection terminated unexpectedly') ||
+        message.includes('Connection terminated') ||
+        message.includes('timeout expired') ||
+        message.includes('statement timeout') ||
+        message.includes('canceling statement');
 
       status.state = isNetworkError ? 'offline' : 'error';
       status.lastError = message;
       status.consecutiveFailures++;
 
       console.error(`[Sync] Error (attempt ${status.consecutiveFailures}): ${message}`);
+
+      // Reset the connection pool after repeated failures to clear dead connections
+      if (status.consecutiveFailures >= POOL_RESET_THRESHOLD) {
+        console.log('[Sync] Resetting Supabase connection pool after repeated failures');
+        try {
+          await resetSupabaseConnection();
+        } catch (resetErr) {
+          console.error('[Sync] Error resetting connection pool:', resetErr);
+        }
+      }
 
       // Exponential backoff
       const backoffInterval = Math.min(
@@ -142,11 +163,15 @@ async function runSyncTick(): Promise<any> {
       if (backoffInterval !== currentInterval && intervalHandle) {
         clearInterval(intervalHandle);
         currentInterval = backoffInterval;
-        intervalHandle = setInterval(runSyncTick, currentInterval);
+        intervalHandle = setInterval(() => {
+          runSyncTick().catch(() => {});
+        }, currentInterval);
         console.log(`[Sync] Backing off to ${currentInterval}ms interval`);
       }
 
-      throw error;
+      // Do NOT re-throw — this is called from setInterval, unhandled rejections
+      // can crash the process or leave the scheduler in a broken state.
+      return null;
     } finally {
       activeSyncPromise = null;
     }

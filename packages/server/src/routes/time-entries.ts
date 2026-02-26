@@ -132,15 +132,17 @@ route.post('/', async (c) => {
       date,
       hours: String(hours),
       notes: notes || null,
-      groupId: groupId || null,
+      groupId: groupId && groupId.trim() ? groupId : null,
     }).returning();
 
     return c.json(entry, 201);
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Failed to create time entry';
-    console.error('Time entry creation failed:', msg);
-    console.error('  Values:', JSON.stringify({ clientId, techId: entryTechId, jobTypeId, rateTierId, date, hours }));
-    if (msg.includes('foreign key') || msg.includes('violates') || msg.includes('FOREIGN KEY')) {
+    const fullErr = err instanceof Error ? err.stack || err.message : String(err);
+    console.error('Time entry creation failed:', fullErr);
+    console.error('  Values:', JSON.stringify({ clientId, techId: entryTechId, jobTypeId, rateTierId, date, hours, notes, groupId }));
+    const lowerMsg = msg.toLowerCase();
+    if (lowerMsg.includes('foreign key') || lowerMsg.includes('violates') || lowerMsg.includes('foreign_key') || lowerMsg.includes('not present in table')) {
       return c.json({ error: 'Invalid reference: one of the selected items (client, job type, or rate tier) does not exist.' }, 400);
     }
     return c.json({ error: msg }, 500);
@@ -167,7 +169,7 @@ route.post('/bulk', async (c) => {
     date: e.date as string,
     hours: String(e.hours),
     notes: (e.notes as string) || null,
-    groupId: (e.groupId as string) || null,
+    groupId: e.groupId && (e.groupId as string).trim() ? (e.groupId as string) : null,
   }));
 
   const created = await db.insert(timeEntries).values(values).returning();
