@@ -1,12 +1,13 @@
 {
   "name": "client-time-tracker",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "private": true,
   "packageManager": "pnpm@10.28.2",
   "scripts": {
     "dev": "next dev --port 3700",
     "dev:server": "pnpm --filter @ctt/server dev",
     "dev:all": "node scripts/dev.js",
+    "dev:all:demo": "DEMO_MODE=true NEXT_PUBLIC_DEMO_MODE=true node scripts/dev.js",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

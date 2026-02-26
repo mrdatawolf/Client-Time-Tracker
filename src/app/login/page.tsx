@@ -134,8 +134,15 @@ export default function LoginPage() {
     );
   }
 
+  const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      {isDemo && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-amber-950 text-center text-xs font-semibold py-1">
+          DEMO MODE — data resets on restart (login: demo / demo)
+        </div>
+      )}
       <div className="w-full max-w-sm px-4">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-8">
           <div className="flex flex-col items-center mb-8">

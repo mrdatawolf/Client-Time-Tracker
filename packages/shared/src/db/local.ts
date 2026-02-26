@@ -8,6 +8,8 @@ import * as relations from '../relations';
 
 const allSchema = { ...schema, ...relations };
 
+const IS_DEMO = process.env.DEMO_MODE === 'true';
+
 // Resolve DB path
 const __filename_local = fileURLToPath(import.meta.url);
 const __dirname_local = path.dirname(__filename_local);
@@ -443,20 +445,27 @@ export async function initializeSchema(client: PGlite): Promise<void> {
 }
 
 async function initializeLocalDb(): Promise<ReturnType<typeof drizzle<typeof allSchema>>> {
-  migrateOldData();
-  ensureDataDirectory();
-  clearStaleLockFile();
+  if (!IS_DEMO) {
+    migrateOldData();
+    ensureDataDirectory();
+    clearStaleLockFile();
+  }
 
   let client: PGlite;
   try {
-    client = new PGlite(DB_PATH);
+    if (IS_DEMO) {
+      console.log('[Demo] Starting ephemeral in-memory database');
+      client = new PGlite();
+    } else {
+      client = new PGlite(DB_PATH);
+    }
     await client.waitReady;
     setPgliteClient(client);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const fullError = new Error(
       `PGlite database initialization failed.\n` +
-      `Database location: ${DB_PATH}\n` +
+      `Database location: ${IS_DEMO ? ':memory:' : DB_PATH}\n` +
       `Original error: ${errorMessage}`
     );
     setInitError(fullError);
@@ -470,6 +479,9 @@ async function initializeLocalDb(): Promise<ReturnType<typeof drizzle<typeof all
     // Reset session state in case a previous sync cycle failed mid-run
     await client.query(`SET app.syncing = 'false'`);
     await initializeSchema(client);
+    if (IS_DEMO) {
+      await seedDemoData(client);
+    }
   } catch (schemaError) {
     const errorMessage = schemaError instanceof Error ? schemaError.message : String(schemaError);
     const fullError = new Error(
@@ -541,6 +553,73 @@ export function isDbInitialized(): boolean {
 /** Get the raw PGlite client (for running migrations outside of init) */
 export function getPgliteClientInstance(): PGlite | null {
   return getPgliteClient();
+}
+
+/** Seed sample data for demo mode (ephemeral in-memory DB) */
+async function seedDemoData(client: PGlite): Promise<void> {
+  console.log('[Demo] Seeding demo data...');
+
+  // Pre-computed bcrypt hash of "demo" (12 rounds)
+  const demoHash = '$2b$12$7EcuKPR1hfjsaWMsRwS2wOYNIrQFXY8zgzRXA3.M/6.C6zLVzrE6.';
+
+  // Users
+  await client.exec(`
+    INSERT INTO users (username, display_name, password_hash, role) VALUES
+      ('demo', 'Demo Admin', '${demoHash}', 'partner'),
+      ('technician', 'Alex Tech', '${demoHash}', 'admin');
+  `);
+
+  // Clients
+  await client.exec(`
+    INSERT INTO clients (name, phone, notes, default_hourly_rate) VALUES
+      ('Acme Corp', '555-0100', 'Long-term managed IT client', 125),
+      ('Bright Solutions', '555-0200', 'Web hosting and email support', 100),
+      ('Cedar Tech', '555-0300', 'Hardware refresh project in progress', 150);
+  `);
+
+  // Job types
+  await client.exec(`
+    INSERT INTO job_types (name) VALUES
+      ('Consulting'), ('Hardware'), ('Software Issue'), ('Networking'),
+      ('Email Issue'), ('Server'), ('Security'), ('Backup/Recovery');
+  `);
+
+  // Rate tiers
+  await client.exec(`
+    INSERT INTO rate_tiers (amount, label) VALUES
+      (75, '$75'), (100, '$100'), (125, '$125'), (150, '$150'), (165, '$165');
+  `);
+
+  // App settings
+  await client.exec(`
+    INSERT INTO app_settings (key, value) VALUES
+      ('baseHourlyRate', '125'),
+      ('companyName', 'Demo IT Services')
+    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+  `);
+
+  // Sample time entries (last 14 days)
+  await client.exec(`
+    WITH
+      u AS (SELECT id FROM users WHERE username = 'demo' LIMIT 1),
+      t AS (SELECT id FROM users WHERE username = 'technician' LIMIT 1),
+      c AS (SELECT id, name FROM clients),
+      j AS (SELECT id, name FROM job_types),
+      r AS (SELECT id, amount FROM rate_tiers)
+    INSERT INTO time_entries (client_id, tech_id, job_type_id, rate_tier_id, date, hours, notes) VALUES
+      ((SELECT id FROM c WHERE name='Acme Corp'), (SELECT id FROM u), (SELECT id FROM j WHERE name='Consulting'), (SELECT id FROM r WHERE amount=125), CURRENT_DATE - INTERVAL '1 day', 2.5, 'Quarterly IT review meeting'),
+      ((SELECT id FROM c WHERE name='Acme Corp'), (SELECT id FROM u), (SELECT id FROM j WHERE name='Server'), (SELECT id FROM r WHERE amount=150), CURRENT_DATE - INTERVAL '2 days', 1.5, 'Patched and rebooted domain controller'),
+      ((SELECT id FROM c WHERE name='Bright Solutions'), (SELECT id FROM t), (SELECT id FROM j WHERE name='Email Issue'), (SELECT id FROM r WHERE amount=100), CURRENT_DATE - INTERVAL '2 days', 0.75, 'Fixed blocked email relay'),
+      ((SELECT id FROM c WHERE name='Bright Solutions'), (SELECT id FROM u), (SELECT id FROM j WHERE name='Networking'), (SELECT id FROM r WHERE amount=125), CURRENT_DATE - INTERVAL '3 days', 1.0, 'Configured new VLAN for guest wifi'),
+      ((SELECT id FROM c WHERE name='Cedar Tech'), (SELECT id FROM t), (SELECT id FROM j WHERE name='Hardware'), (SELECT id FROM r WHERE amount=150), CURRENT_DATE - INTERVAL '4 days', 3.0, 'Installed 4 new workstations'),
+      ((SELECT id FROM c WHERE name='Cedar Tech'), (SELECT id FROM u), (SELECT id FROM j WHERE name='Backup/Recovery'), (SELECT id FROM r WHERE amount=125), CURRENT_DATE - INTERVAL '5 days', 1.25, 'Set up NAS backup schedule'),
+      ((SELECT id FROM c WHERE name='Acme Corp'), (SELECT id FROM t), (SELECT id FROM j WHERE name='Software Issue'), (SELECT id FROM r WHERE amount=100), CURRENT_DATE - INTERVAL '6 days', 0.5, 'Resolved QuickBooks license issue'),
+      ((SELECT id FROM c WHERE name='Bright Solutions'), (SELECT id FROM u), (SELECT id FROM j WHERE name='Security'), (SELECT id FROM r WHERE amount=165), CURRENT_DATE - INTERVAL '7 days', 2.0, 'Malware scan and cleanup'),
+      ((SELECT id FROM c WHERE name='Cedar Tech'), (SELECT id FROM t), (SELECT id FROM j WHERE name='Networking'), (SELECT id FROM r WHERE amount=125), CURRENT_DATE - INTERVAL '9 days', 1.5, 'Troubleshot intermittent connectivity'),
+      ((SELECT id FROM c WHERE name='Acme Corp'), (SELECT id FROM u), (SELECT id FROM j WHERE name='Consulting'), (SELECT id FROM r WHERE amount=125), CURRENT_DATE - INTERVAL '12 days', 1.0, 'Monthly status call');
+  `);
+
+  console.log('[Demo] Demo data seeded (login: demo / demo)');
 }
 
 export { allSchema as schema };

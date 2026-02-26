@@ -101,12 +101,19 @@ export default function AppLayout({
     );
   }
 
+  const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+
   return (
     <div className="flex h-screen overflow-hidden">
       <Toaster position="top-right" richColors />
       <SyncOverlay visible={syncing} message={syncMessage} />
+      {isDemo && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-amber-950 text-center text-xs font-semibold py-1">
+          DEMO MODE — data resets on restart (login: demo / demo)
+        </div>
+      )}
       <Sidebar />
-      <main className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-900 p-6">
+      <main className={`flex-1 overflow-auto bg-gray-50 dark:bg-gray-900 p-6 ${isDemo ? 'pt-12' : ''}`}>
         {children}
       </main>
     </div>
