@@ -449,6 +449,9 @@ function getSchemaSQL(): string {
     EXCEPTION WHEN duplicate_object THEN NULL;
     END $$;
 
+    -- Add partner role (migration for existing databases)
+    ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'partner';
+
     -- Users
     CREATE TABLE IF NOT EXISTS users (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

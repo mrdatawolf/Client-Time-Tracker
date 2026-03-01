@@ -1,6 +1,6 @@
 {
   "name": "client-time-tracker",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "private": true,
   "packageManager": "pnpm@10.28.2",
   "scripts": {
