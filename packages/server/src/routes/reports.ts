@@ -740,4 +740,359 @@ app.get('/tech-utilization', requireAdmin(), async (c) => {
   }));
 });
 
+// Annual Revenue Summary: Calendar-year revenue by client with quarterly breakdown
+app.get('/annual-revenue', requireAdmin(), async (c) => {
+  const db = await getDb();
+  const localClient = (db as any)._.session.client;
+  const year = c.req.query('year') || String(new Date().getFullYear());
+  const dateFrom = `${year}-01-01`;
+  const dateTo = `${year}-12-31`;
+
+  const query = `
+    SELECT
+      cl.id as client_id,
+      cl.name as client_name,
+      CAST(te.hours AS NUMERIC) as hours,
+      CAST(rt.amount AS NUMERIC) as rate,
+      te.is_billed,
+      te.is_paid,
+      EXTRACT(QUARTER FROM te.date) as quarter
+    FROM time_entries te
+    JOIN clients cl ON te.client_id = cl.id
+    JOIN rate_tiers rt ON te.rate_tier_id = rt.id
+    WHERE te.date >= $1 AND te.date <= $2
+  `;
+
+  const res = await localClient.query(query, [dateFrom, dateTo]);
+
+  const clientMap = new Map<string, {
+    clientId: string; clientName: string;
+    totalHours: number; totalRevenue: number;
+    billedRevenue: number; collectedRevenue: number;
+    q1: number; q2: number; q3: number; q4: number;
+  }>();
+
+  const totals = { totalHours: 0, totalRevenue: 0, billedRevenue: 0, collectedRevenue: 0, q1: 0, q2: 0, q3: 0, q4: 0 };
+
+  for (const row of res.rows) {
+    const revenue = parseFloat(row.hours) * parseFloat(row.rate);
+    const hours = parseFloat(row.hours);
+    const q = parseInt(row.quarter);
+
+    if (!clientMap.has(row.client_id)) {
+      clientMap.set(row.client_id, {
+        clientId: row.client_id, clientName: row.client_name,
+        totalHours: 0, totalRevenue: 0, billedRevenue: 0, collectedRevenue: 0,
+        q1: 0, q2: 0, q3: 0, q4: 0,
+      });
+    }
+    const entry = clientMap.get(row.client_id)!;
+    entry.totalHours += hours;
+    entry.totalRevenue += revenue;
+    if (row.is_billed) entry.billedRevenue += revenue;
+    if (row.is_paid) entry.collectedRevenue += revenue;
+    if (q === 1) entry.q1 += revenue;
+    else if (q === 2) entry.q2 += revenue;
+    else if (q === 3) entry.q3 += revenue;
+    else if (q === 4) entry.q4 += revenue;
+
+    totals.totalHours += hours;
+    totals.totalRevenue += revenue;
+    if (row.is_billed) totals.billedRevenue += revenue;
+    if (row.is_paid) totals.collectedRevenue += revenue;
+    if (q === 1) totals.q1 += revenue;
+    else if (q === 2) totals.q2 += revenue;
+    else if (q === 3) totals.q3 += revenue;
+    else if (q === 4) totals.q4 += revenue;
+  }
+
+  const formatRow = (r: typeof totals & { clientId?: string; clientName?: string }) => ({
+    ...(r.clientId ? { clientId: r.clientId, clientName: r.clientName } : {}),
+    totalHours: r.totalHours.toFixed(2),
+    totalRevenue: r.totalRevenue.toFixed(2),
+    billedRevenue: r.billedRevenue.toFixed(2),
+    collectedRevenue: r.collectedRevenue.toFixed(2),
+    outstandingRevenue: (r.totalRevenue - r.collectedRevenue).toFixed(2),
+    q1: r.q1.toFixed(2),
+    q2: r.q2.toFixed(2),
+    q3: r.q3.toFixed(2),
+    q4: r.q4.toFixed(2),
+  });
+
+  return c.json({
+    year,
+    clients: Array.from(clientMap.values()).map(formatRow).sort((a, b) => parseFloat(b.totalRevenue) - parseFloat(a.totalRevenue)),
+    totals: formatRow(totals),
+  });
+});
+
+// Partner Earnings (1099-Ready): Annual earnings per partner with split detail
+app.get('/partner-earnings', requireAdmin(), async (c) => {
+  const db = await getDb();
+  const localClient = (db as any)._.session.client;
+  const year = c.req.query('year') || String(new Date().getFullYear());
+  const dateFrom = `${year}-01-01`;
+  const dateTo = `${year}-12-31`;
+
+  // Get split settings
+  const settingsRes = await localClient.query(`
+    SELECT key, value FROM app_settings
+    WHERE key IN ('splitTechPercent', 'splitHolderPercent')
+  `);
+  const settings: Record<string, number> = {};
+  settingsRes.rows.forEach((r: any) => {
+    settings[r.key] = parseFloat(r.value) / 100;
+  });
+  const techSplit = settings.splitTechPercent || 0.73;
+  const holderSplit = settings.splitHolderPercent || 0.27;
+
+  // Query paid time entries for the year
+  const entriesRes = await localClient.query(`
+    SELECT
+      te.tech_id,
+      c.account_holder_id,
+      (CAST(te.hours AS NUMERIC) * CAST(rt.amount AS NUMERIC)) as revenue,
+      u_tech.display_name as tech_name,
+      u_holder.display_name as holder_name
+    FROM time_entries te
+    JOIN clients c ON te.client_id = c.id
+    JOIN rate_tiers rt ON te.rate_tier_id = rt.id
+    JOIN users u_tech ON te.tech_id = u_tech.id
+    LEFT JOIN users u_holder ON c.account_holder_id = u_holder.id
+    WHERE te.is_paid = true AND te.date >= $1 AND te.date <= $2
+  `, [dateFrom, dateTo]);
+
+  // Get all partners
+  const partnersRes = await localClient.query(`
+    SELECT id, display_name FROM users
+    WHERE role IN ('admin', 'partner') AND is_active = true
+  `);
+
+  // Get partner payments for this year
+  const paymentsRes = await localClient.query(`
+    SELECT to_partner_id, SUM(CAST(amount AS NUMERIC)) as total_paid
+    FROM partner_payments
+    WHERE date_paid >= $1 AND date_paid <= $2
+    GROUP BY to_partner_id
+  `, [dateFrom, dateTo]);
+
+  const paymentMap = new Map();
+  paymentsRes.rows.forEach((r: any) => paymentMap.set(r.to_partner_id, parseFloat(r.total_paid)));
+
+  // Build report
+  const report = new Map<string, {
+    id: string; name: string;
+    earnedAsTech: number; earnedAsHolder: number;
+    totalEarned: number; totalPaid: number; balance: number;
+  }>();
+
+  partnersRes.rows.forEach((p: any) => {
+    report.set(p.id, {
+      id: p.id, name: p.display_name,
+      earnedAsTech: 0, earnedAsHolder: 0,
+      totalEarned: 0, totalPaid: paymentMap.get(p.id) || 0, balance: 0,
+    });
+  });
+
+  entriesRes.rows.forEach((row: any) => {
+    const revenue = parseFloat(row.revenue);
+
+    if (report.has(row.tech_id)) {
+      const p = report.get(row.tech_id)!;
+      const share = row.tech_id === row.account_holder_id ? revenue : revenue * techSplit;
+      p.earnedAsTech += share;
+      p.totalEarned += share;
+    }
+
+    if (row.account_holder_id && row.tech_id !== row.account_holder_id && report.has(row.account_holder_id)) {
+      const p = report.get(row.account_holder_id)!;
+      const share = revenue * holderSplit;
+      p.earnedAsHolder += share;
+      p.totalEarned += share;
+    }
+  });
+
+  const result = Array.from(report.values()).map(p => ({
+    id: p.id,
+    name: p.name,
+    earnedAsTech: p.earnedAsTech.toFixed(2),
+    earnedAsHolder: p.earnedAsHolder.toFixed(2),
+    totalEarned: p.totalEarned.toFixed(2),
+    totalPaid: p.totalPaid.toFixed(2),
+    balance: (p.totalEarned - p.totalPaid).toFixed(2),
+  }));
+
+  return c.json({ year, partners: result, splitConfig: { techPercent: techSplit * 100, holderPercent: holderSplit * 100 } });
+});
+
+// Payments Received Ledger: All payments in a calendar year grouped by client/month
+app.get('/payments-ledger', requireAdmin(), async (c) => {
+  const db = await getDb();
+  const localClient = (db as any)._.session.client;
+  const year = c.req.query('year') || String(new Date().getFullYear());
+  const dateFrom = `${year}-01-01`;
+  const dateTo = `${year}-12-31`;
+
+  const query = `
+    SELECT
+      p.id,
+      p.amount,
+      p.date_paid,
+      p.method,
+      p.notes,
+      i.invoice_number,
+      cl.id as client_id,
+      cl.name as client_name
+    FROM payments p
+    JOIN invoices i ON p.invoice_id = i.id
+    JOIN clients cl ON i.client_id = cl.id
+    WHERE p.date_paid >= $1 AND p.date_paid <= $2
+    ORDER BY cl.name, p.date_paid
+  `;
+
+  const res = await localClient.query(query, [dateFrom, dateTo]);
+
+  // Group by client, then by month
+  const clientMap = new Map<string, {
+    clientId: string; clientName: string; clientTotal: number;
+    months: Map<number, { month: number; payments: any[]; subtotal: number }>;
+  }>();
+
+  let grandTotal = 0;
+
+  for (const row of res.rows) {
+    const amount = parseFloat(row.amount);
+    const datePaid = row.date_paid instanceof Date ? row.date_paid : new Date(row.date_paid);
+    const month = datePaid.getMonth() + 1; // 1-12
+
+    if (!clientMap.has(row.client_id)) {
+      clientMap.set(row.client_id, {
+        clientId: row.client_id, clientName: row.client_name,
+        clientTotal: 0, months: new Map(),
+      });
+    }
+    const client = clientMap.get(row.client_id)!;
+    client.clientTotal += amount;
+    grandTotal += amount;
+
+    if (!client.months.has(month)) {
+      client.months.set(month, { month, payments: [], subtotal: 0 });
+    }
+    const m = client.months.get(month)!;
+    m.subtotal += amount;
+    m.payments.push({
+      id: row.id,
+      datePaid: datePaid instanceof Date ? datePaid.toISOString().split('T')[0] : String(datePaid).split('T')[0],
+      invoiceNumber: row.invoice_number,
+      amount: amount.toFixed(2),
+      method: row.method,
+      notes: row.notes,
+    });
+  }
+
+  const monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
+
+  const clients = Array.from(clientMap.values())
+    .sort((a, b) => a.clientName.localeCompare(b.clientName))
+    .map(client => ({
+      clientId: client.clientId,
+      clientName: client.clientName,
+      clientTotal: client.clientTotal.toFixed(2),
+      months: Array.from(client.months.values())
+        .sort((a, b) => a.month - b.month)
+        .map(m => ({
+          month: m.month,
+          monthName: monthNames[m.month],
+          subtotal: m.subtotal.toFixed(2),
+          payments: m.payments,
+        })),
+    }));
+
+  return c.json({ year, clients, grandTotal: grandTotal.toFixed(2) });
+});
+
+// Tax Report CSV Export
+app.get('/tax-export', requireAdmin(), async (c) => {
+  const year = c.req.query('year') || String(new Date().getFullYear());
+  const type = c.req.query('type');
+
+  if (!type || !['annual-revenue', 'partner-earnings', 'payments-ledger'].includes(type)) {
+    return c.json({ error: 'type must be one of: annual-revenue, partner-earnings, payments-ledger' }, 400);
+  }
+
+  // Re-fetch data by forwarding to the appropriate handler's logic
+  const baseUrl = new URL(c.req.url);
+  const apiBase = `${baseUrl.protocol}//${baseUrl.host}`;
+
+  let csv = '';
+  let filename = '';
+
+  if (type === 'annual-revenue') {
+    // Fetch annual revenue data internally
+    const res = await fetch(`${apiBase}/api/reports/annual-revenue?year=${year}`, {
+      headers: { Authorization: c.req.header('Authorization') || '' },
+    });
+    const data = await res.json() as { clients: any[]; totals: any };
+
+    const headers = ['Client', 'Total Hours', 'Total Revenue', 'Billed Amount', 'Collected Amount', 'Outstanding', 'Q1 Revenue', 'Q2 Revenue', 'Q3 Revenue', 'Q4 Revenue'];
+    const rows = data.clients.map((r: any) => [
+      `"${(r.clientName || '').replace(/"/g, '""')}"`,
+      r.totalHours, r.totalRevenue, r.billedRevenue, r.collectedRevenue, r.outstandingRevenue,
+      r.q1, r.q2, r.q3, r.q4,
+    ]);
+    // Add totals row
+    const t = data.totals;
+    rows.push(['TOTAL', t.totalHours, t.totalRevenue, t.billedRevenue, t.collectedRevenue, t.outstandingRevenue, t.q1, t.q2, t.q3, t.q4]);
+    csv = [headers.join(','), ...rows.map((r: any[]) => r.join(','))].join('\n');
+    filename = `annual-revenue-${year}.csv`;
+
+  } else if (type === 'partner-earnings') {
+    const res = await fetch(`${apiBase}/api/reports/partner-earnings?year=${year}`, {
+      headers: { Authorization: c.req.header('Authorization') || '' },
+    });
+    const data = await res.json() as { partners: any[] };
+
+    const headers = ['Partner Name', 'Earned as Tech', 'Earned as Account Holder', 'Total Earned', 'Total Paid', 'Balance'];
+    const rows = data.partners.map((r: any) => [
+      `"${(r.name || '').replace(/"/g, '""')}"`,
+      r.earnedAsTech, r.earnedAsHolder, r.totalEarned, r.totalPaid, r.balance,
+    ]);
+    csv = [headers.join(','), ...rows.map((r: any[]) => r.join(','))].join('\n');
+    filename = `partner-earnings-${year}.csv`;
+
+  } else if (type === 'payments-ledger') {
+    const res = await fetch(`${apiBase}/api/reports/payments-ledger?year=${year}`, {
+      headers: { Authorization: c.req.header('Authorization') || '' },
+    });
+    const data = await res.json() as { clients: any[]; grandTotal: string };
+
+    const headers = ['Date', 'Client', 'Invoice #', 'Amount', 'Payment Method'];
+    const rows: any[][] = [];
+    for (const client of data.clients) {
+      for (const month of client.months) {
+        for (const payment of month.payments) {
+          rows.push([
+            payment.datePaid,
+            `"${(client.clientName || '').replace(/"/g, '""')}"`,
+            payment.invoiceNumber || '',
+            payment.amount,
+            payment.method || '',
+          ]);
+        }
+      }
+    }
+    rows.push(['', '', '', data.grandTotal, 'TOTAL']);
+    csv = [headers.join(','), ...rows.map((r: any[]) => r.join(','))].join('\n');
+    filename = `payments-ledger-${year}.csv`;
+  }
+
+  return new Response(csv, {
+    headers: {
+      'Content-Type': 'text/csv',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+    },
+  });
+});
+
 export default app;

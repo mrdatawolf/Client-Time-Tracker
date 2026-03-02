@@ -538,6 +538,75 @@ export interface PartnerSettlementReport {
     firmYield: string;
   }
   
+  // Tax report types
+  export interface AnnualRevenueReport {
+    year: string;
+    clients: Array<{
+      clientId: string;
+      clientName: string;
+      totalHours: string;
+      totalRevenue: string;
+      billedRevenue: string;
+      collectedRevenue: string;
+      outstandingRevenue: string;
+      q1: string;
+      q2: string;
+      q3: string;
+      q4: string;
+    }>;
+    totals: {
+      totalHours: string;
+      totalRevenue: string;
+      billedRevenue: string;
+      collectedRevenue: string;
+      outstandingRevenue: string;
+      q1: string;
+      q2: string;
+      q3: string;
+      q4: string;
+    };
+  }
+
+  export interface PartnerEarningsReport {
+    year: string;
+    partners: Array<{
+      id: string;
+      name: string;
+      earnedAsTech: string;
+      earnedAsHolder: string;
+      totalEarned: string;
+      totalPaid: string;
+      balance: string;
+    }>;
+    splitConfig: {
+      techPercent: number;
+      holderPercent: number;
+    };
+  }
+
+  export interface PaymentsLedgerReport {
+    year: string;
+    clients: Array<{
+      clientId: string;
+      clientName: string;
+      clientTotal: string;
+      months: Array<{
+        month: number;
+        monthName: string;
+        subtotal: string;
+        payments: Array<{
+          id: string;
+          datePaid: string;
+          invoiceNumber: string;
+          amount: string;
+          method: string | null;
+          notes: string | null;
+        }>;
+      }>;
+    }>;
+    grandTotal: string;
+  }
+
   export const reports = {
     clientSummary: (filters?: { dateFrom?: string; dateTo?: string }) => {
       const params = new URLSearchParams();
@@ -618,6 +687,35 @@ export interface PartnerSettlementReport {
       method: 'POST',
       body: JSON.stringify({ invoiceId }),
     }),
+
+  annualRevenue: (year?: number) => {
+    const params = new URLSearchParams();
+    if (year) params.set('year', String(year));
+    const qs = params.toString();
+    return apiClient<AnnualRevenueReport>(`/api/reports/annual-revenue${qs ? `?${qs}` : ''}`);
+  },
+
+  partnerEarnings: (year?: number) => {
+    const params = new URLSearchParams();
+    if (year) params.set('year', String(year));
+    const qs = params.toString();
+    return apiClient<PartnerEarningsReport>(`/api/reports/partner-earnings${qs ? `?${qs}` : ''}`);
+  },
+
+  paymentsLedger: (year?: number) => {
+    const params = new URLSearchParams();
+    if (year) params.set('year', String(year));
+    const qs = params.toString();
+    return apiClient<PaymentsLedgerReport>(`/api/reports/payments-ledger${qs ? `?${qs}` : ''}`);
+  },
+
+  taxExportUrl: (year: number, type: 'annual-revenue' | 'partner-earnings' | 'payments-ledger') => {
+    const params = new URLSearchParams({ year: String(year), type });
+    const token = typeof window !== 'undefined' ? localStorage.getItem('ctt_token') : '';
+    if (token) params.set('token', token);
+    const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3701';
+    return `${base}/api/reports/tax-export?${params.toString()}`;
+  },
 };
 
 // --- Partner ---

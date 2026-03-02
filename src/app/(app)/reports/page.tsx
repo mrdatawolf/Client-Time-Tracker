@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { BarChart3, Download, Users, Briefcase, List, DollarSign, Pencil, Check, Clock, Timer, TrendingUp, UserCheck } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { BarChart3, Download, Users, Briefcase, List, DollarSign, Pencil, Check, Clock, Timer, TrendingUp, UserCheck, FileText, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -25,11 +25,14 @@ import {
   type WipReport,
   type EffectiveRateReport,
   type TechUtilizationReport,
+  type AnnualRevenueReport,
+  type PartnerEarningsReport,
+  type PaymentsLedgerReport,
 } from '@/lib/api';
 import { formatCurrency, formatDate, toISODate } from '@/lib/utils';
 import { isAdmin } from '@/lib/api-client';
 
-type Tab = 'client' | 'tech' | 'entries' | 'balance' | 'settlement' | 'aged' | 'wip' | 'profitability' | 'utilization';
+type Tab = 'client' | 'tech' | 'entries' | 'balance' | 'settlement' | 'aged' | 'wip' | 'profitability' | 'utilization' | 'tax';
 
 export default function ReportsPage() {
   const admin = isAdmin();
@@ -47,6 +50,14 @@ export default function ReportsPage() {
   const [utilizationData, setUtilizationData] = useState<TechUtilizationReport[]>([]);
   const [entries, setEntries] = useState<DateRangeEntry[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Tax tab state
+  const [taxYear, setTaxYear] = useState(new Date().getFullYear());
+  const [annualRevenueData, setAnnualRevenueData] = useState<AnnualRevenueReport | null>(null);
+  const [partnerEarningsData, setPartnerEarningsData] = useState<PartnerEarningsReport | null>(null);
+  const [paymentsLedgerData, setPaymentsLedgerData] = useState<PaymentsLedgerReport | null>(null);
+  const [taxLoading, setTaxLoading] = useState(false);
+  const [expandedTaxSections, setExpandedTaxSections] = useState<Set<string>>(new Set(['revenue', 'earnings', 'payments']));
 
   // Balance tab state
   const [balanceClient, setBalanceClient] = useState('');
@@ -84,7 +95,7 @@ export default function ReportsPage() {
   }, []);
 
   const loadData = useCallback(async () => {
-    if (tab === 'balance') return; // balance tab has its own loader
+    if (tab === 'balance' || tab === 'tax') return; // these tabs have their own loaders
     if (!dateFrom || !dateTo) return;
     setLoading(true);
     try {
@@ -135,6 +146,45 @@ export default function ReportsPage() {
       loadBalance();
     }
   }, [tab, loadBalance]);
+
+  // Tax tab data loader
+  const loadTaxData = useCallback(async () => {
+    setTaxLoading(true);
+    try {
+      const [revenue, earnings, ledger] = await Promise.all([
+        reportsApi.annualRevenue(taxYear),
+        reportsApi.partnerEarnings(taxYear),
+        reportsApi.paymentsLedger(taxYear),
+      ]);
+      setAnnualRevenueData(revenue);
+      setPartnerEarningsData(earnings);
+      setPaymentsLedgerData(ledger);
+    } catch (err) {
+      console.error('Failed to load tax data:', err);
+    } finally {
+      setTaxLoading(false);
+    }
+  }, [taxYear]);
+
+  useEffect(() => {
+    if (tab === 'tax') {
+      loadTaxData();
+    }
+  }, [tab, loadTaxData]);
+
+  function toggleTaxSection(section: string) {
+    setExpandedTaxSections(prev => {
+      const next = new Set(prev);
+      if (next.has(section)) next.delete(section);
+      else next.add(section);
+      return next;
+    });
+  }
+
+  function handleTaxExport(type: 'annual-revenue' | 'partner-earnings' | 'payments-ledger') {
+    const url = reportsApi.taxExportUrl(taxYear, type);
+    window.open(url, '_blank');
+  }
 
   function handleExport() {
     const url = reportsApi.exportUrl({
@@ -216,6 +266,7 @@ export default function ReportsPage() {
     { key: 'utilization', label: 'Utilization', icon: UserCheck, adminOnly: true },
     { key: 'entries', label: 'Entries', icon: List },
     { key: 'balance', label: 'Balance', icon: DollarSign, adminOnly: true },
+    { key: 'tax', label: 'Year-End Tax', icon: FileText, adminOnly: true },
   ];
 
   const visibleTabs = tabs.filter(t => !t.adminOnly || admin);
@@ -230,7 +281,7 @@ export default function ReportsPage() {
           </h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">Time and revenue analytics</p>
         </div>
-        {tab !== 'balance' && (
+        {tab !== 'balance' && tab !== 'tax' && (
           <Button variant="outline" onClick={handleExport}>
             <Download className="w-4 h-4 mr-2" />
             Export CSV
@@ -239,7 +290,22 @@ export default function ReportsPage() {
       </div>
 
       {/* Filters */}
-      {tab !== 'balance' ? (
+      {tab === 'tax' ? (
+        <div className="flex flex-wrap items-end gap-3 mb-6">
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Tax Year</label>
+            <select
+              value={taxYear}
+              onChange={(e) => setTaxYear(parseInt(e.target.value))}
+              className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 h-9"
+            >
+              {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      ) : tab !== 'balance' ? (
         <div className="flex flex-wrap items-end gap-3 mb-6">
           <div className="space-y-1">
             <label className="text-xs font-medium text-gray-500 dark:text-gray-400">From</label>
@@ -324,7 +390,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Content */}
-      {loading && tab !== 'balance' ? (
+      {loading && tab !== 'balance' && tab !== 'tax' ? (
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-8 text-center text-gray-500 dark:text-gray-400">
           Loading...
         </div>
@@ -769,6 +835,231 @@ export default function ReportsPage() {
                     </tr>
                   </tfoot>
                 </table>
+              </div>
+            </>
+          )}
+        </div>
+      ) : tab === 'tax' ? (
+        /* Year-End Tax tab */
+        <div className="space-y-4">
+          {taxLoading ? (
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-8 text-center text-gray-500 dark:text-gray-400">
+              Loading tax data...
+            </div>
+          ) : (
+            <>
+              {/* Annual Revenue Summary */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+                <button
+                  onClick={() => toggleTaxSection('revenue')}
+                  className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  <div className="flex items-center gap-2">
+                    {expandedTaxSections.has('revenue') ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Annual Revenue Summary</h3>
+                    {annualRevenueData && (
+                      <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">
+                        ({annualRevenueData.clients.length} clients, {formatCurrency(annualRevenueData.totals.totalRevenue)} total)
+                      </span>
+                    )}
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleTaxExport('annual-revenue'); }}>
+                    <Download className="w-4 h-4 mr-1" /> CSV
+                  </Button>
+                </button>
+                {expandedTaxSections.has('revenue') && annualRevenueData && (
+                  annualRevenueData.clients.length === 0 ? (
+                    <div className="p-6 text-center text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700">No revenue data for {taxYear}</div>
+                  ) : (
+                    <div className="overflow-x-auto border-t border-gray-200 dark:border-gray-700">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Client</th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Hours</th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total Revenue</th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Billed</th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Collected</th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Outstanding</th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Q1</th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Q2</th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Q3</th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Q4</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                          {annualRevenueData.clients.map((row) => (
+                            <tr key={row.clientId} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                              <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{row.clientName}</td>
+                              <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{row.totalHours}h</td>
+                              <td className="px-4 py-3 text-right font-medium text-gray-900 dark:text-gray-100">{formatCurrency(row.totalRevenue)}</td>
+                              <td className="px-4 py-3 text-right text-blue-600">{formatCurrency(row.billedRevenue)}</td>
+                              <td className="px-4 py-3 text-right text-green-600">{formatCurrency(row.collectedRevenue)}</td>
+                              <td className="px-4 py-3 text-right text-amber-600">{formatCurrency(row.outstandingRevenue)}</td>
+                              <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{formatCurrency(row.q1)}</td>
+                              <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{formatCurrency(row.q2)}</td>
+                              <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{formatCurrency(row.q3)}</td>
+                              <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{formatCurrency(row.q4)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 font-semibold">
+                            <td className="px-4 py-3 text-gray-700 dark:text-gray-300">Total</td>
+                            <td className="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{annualRevenueData.totals.totalHours}h</td>
+                            <td className="px-4 py-3 text-right text-gray-900 dark:text-gray-100">{formatCurrency(annualRevenueData.totals.totalRevenue)}</td>
+                            <td className="px-4 py-3 text-right text-blue-600">{formatCurrency(annualRevenueData.totals.billedRevenue)}</td>
+                            <td className="px-4 py-3 text-right text-green-600">{formatCurrency(annualRevenueData.totals.collectedRevenue)}</td>
+                            <td className="px-4 py-3 text-right text-amber-600">{formatCurrency(annualRevenueData.totals.outstandingRevenue)}</td>
+                            <td className="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{formatCurrency(annualRevenueData.totals.q1)}</td>
+                            <td className="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{formatCurrency(annualRevenueData.totals.q2)}</td>
+                            <td className="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{formatCurrency(annualRevenueData.totals.q3)}</td>
+                            <td className="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{formatCurrency(annualRevenueData.totals.q4)}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )
+                )}
+              </div>
+
+              {/* Partner Earnings (1099-Ready) */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+                <button
+                  onClick={() => toggleTaxSection('earnings')}
+                  className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  <div className="flex items-center gap-2">
+                    {expandedTaxSections.has('earnings') ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Partner Earnings (1099-Ready)</h3>
+                    {partnerEarningsData && (
+                      <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">
+                        ({partnerEarningsData.splitConfig.techPercent}% tech / {partnerEarningsData.splitConfig.holderPercent}% holder split)
+                      </span>
+                    )}
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleTaxExport('partner-earnings'); }}>
+                    <Download className="w-4 h-4 mr-1" /> CSV
+                  </Button>
+                </button>
+                {expandedTaxSections.has('earnings') && partnerEarningsData && (
+                  partnerEarningsData.partners.length === 0 ? (
+                    <div className="p-6 text-center text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700">No partner earnings data for {taxYear}</div>
+                  ) : (
+                    <div className="overflow-x-auto border-t border-gray-200 dark:border-gray-700">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Partner</th>
+                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Earned as Tech</th>
+                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Earned as Holder</th>
+                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total Earned</th>
+                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total Paid</th>
+                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Balance</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                          {partnerEarningsData.partners.map((row) => (
+                            <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                              <td className="px-6 py-3 font-medium text-gray-900 dark:text-gray-100">{row.name}</td>
+                              <td className="px-6 py-3 text-right text-gray-600 dark:text-gray-400">{formatCurrency(row.earnedAsTech)}</td>
+                              <td className="px-6 py-3 text-right text-gray-600 dark:text-gray-400">{formatCurrency(row.earnedAsHolder)}</td>
+                              <td className="px-6 py-3 text-right font-medium text-gray-900 dark:text-gray-100">{formatCurrency(row.totalEarned)}</td>
+                              <td className="px-6 py-3 text-right text-green-600">{formatCurrency(row.totalPaid)}</td>
+                              <td className="px-6 py-3 text-right">
+                                <span className={parseFloat(row.balance) > 0 ? 'text-amber-600 font-medium' : 'text-green-600'}>
+                                  {formatCurrency(row.balance)}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 font-semibold">
+                            <td className="px-6 py-3 text-gray-700 dark:text-gray-300">Total</td>
+                            <td className="px-6 py-3 text-right text-gray-700 dark:text-gray-300">
+                              {formatCurrency(partnerEarningsData.partners.reduce((s, p) => s + parseFloat(p.earnedAsTech), 0))}
+                            </td>
+                            <td className="px-6 py-3 text-right text-gray-700 dark:text-gray-300">
+                              {formatCurrency(partnerEarningsData.partners.reduce((s, p) => s + parseFloat(p.earnedAsHolder), 0))}
+                            </td>
+                            <td className="px-6 py-3 text-right text-gray-900 dark:text-gray-100">
+                              {formatCurrency(partnerEarningsData.partners.reduce((s, p) => s + parseFloat(p.totalEarned), 0))}
+                            </td>
+                            <td className="px-6 py-3 text-right text-green-600">
+                              {formatCurrency(partnerEarningsData.partners.reduce((s, p) => s + parseFloat(p.totalPaid), 0))}
+                            </td>
+                            <td className="px-6 py-3 text-right text-amber-600">
+                              {formatCurrency(partnerEarningsData.partners.reduce((s, p) => s + parseFloat(p.balance), 0))}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )
+                )}
+              </div>
+
+              {/* Payments Received Ledger */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+                <button
+                  onClick={() => toggleTaxSection('payments')}
+                  className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  <div className="flex items-center gap-2">
+                    {expandedTaxSections.has('payments') ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Payments Received Ledger</h3>
+                    {paymentsLedgerData && (
+                      <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">
+                        ({formatCurrency(paymentsLedgerData.grandTotal)} total collected)
+                      </span>
+                    )}
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleTaxExport('payments-ledger'); }}>
+                    <Download className="w-4 h-4 mr-1" /> CSV
+                  </Button>
+                </button>
+                {expandedTaxSections.has('payments') && paymentsLedgerData && (
+                  paymentsLedgerData.clients.length === 0 ? (
+                    <div className="p-6 text-center text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700">No payments recorded for {taxYear}</div>
+                  ) : (
+                    <div className="border-t border-gray-200 dark:border-gray-700">
+                      {paymentsLedgerData.clients.map((client) => (
+                        <div key={client.clientId}>
+                          <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                            <span className="font-medium text-gray-900 dark:text-gray-100">{client.clientName}</span>
+                            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{formatCurrency(client.clientTotal)}</span>
+                          </div>
+                          <table className="w-full text-sm">
+                            <tbody>
+                              {client.months.map((month) => (
+                                <React.Fragment key={month.month}>
+                                  <tr className="bg-gray-25 dark:bg-gray-750">
+                                    <td colSpan={4} className="px-6 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase border-b border-gray-100 dark:border-gray-700">
+                                      {month.monthName} — {formatCurrency(month.subtotal)}
+                                    </td>
+                                  </tr>
+                                  {month.payments.map((payment) => (
+                                    <tr key={payment.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700">
+                                      <td className="px-6 py-2 text-gray-600 dark:text-gray-400 w-32">{formatDate(payment.datePaid)}</td>
+                                      <td className="px-6 py-2 text-gray-600 dark:text-gray-400">{payment.invoiceNumber}</td>
+                                      <td className="px-6 py-2 text-right font-medium text-gray-900 dark:text-gray-100 w-32">{formatCurrency(payment.amount)}</td>
+                                      <td className="px-6 py-2 text-gray-500 dark:text-gray-400 w-32">{payment.method || '-'}</td>
+                                    </tr>
+                                  ))}
+                                </React.Fragment>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ))}
+                      <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between font-semibold">
+                        <span className="text-gray-700 dark:text-gray-300">Grand Total</span>
+                        <span className="text-gray-900 dark:text-gray-100">{formatCurrency(paymentsLedgerData.grandTotal)}</span>
+                      </div>
+                    </div>
+                  )
+                )}
               </div>
             </>
           )}
