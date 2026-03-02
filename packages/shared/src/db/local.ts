@@ -356,6 +356,8 @@ export async function initializeSchema(client: PGlite): Promise<void> {
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS invoice_payable_to TEXT;
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS billing_cycle TEXT;
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS billing_day NUMERIC(2, 0);
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS invoice_prefix TEXT;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS next_invoice_number NUMERIC(10, 0) DEFAULT 1000;
 
     ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS group_id UUID;
 

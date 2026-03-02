@@ -32,6 +32,8 @@ export const clients = pgTable('clients', {
   invoicePayableTo: text('invoice_payable_to'),
   billingCycle: text('billing_cycle'),
   billingDay: numeric('billing_day'),
+  invoicePrefix: text('invoice_prefix'),
+  nextInvoiceNumber: numeric('next_invoice_number', { precision: 10, scale: 0 }).default('1000'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });

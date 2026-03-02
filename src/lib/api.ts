@@ -29,6 +29,8 @@ export interface Client {
   invoicePayableTo: string | null;
   billingCycle: string | null;
   billingDay: string | null;
+  invoicePrefix: string | null;
+  nextInvoiceNumber: string | null;
   createdAt: string;
   updatedAt: string;
   // Computed balances from list endpoint
@@ -108,13 +110,13 @@ export const clients = {
 
   get: (id: string) => apiClient<Client>(`/api/clients/${id}`),
 
-  create: (data: { name: string; accountHolder?: string; accountHolderId?: string | null; phone?: string; mailingAddress?: string; notes?: string; defaultHourlyRate?: string; invoicePayableTo?: string; billingCycle?: string | null; billingDay?: number | null }) =>
+  create: (data: { name: string; accountHolder?: string; accountHolderId?: string | null; phone?: string; mailingAddress?: string; notes?: string; defaultHourlyRate?: string; invoicePayableTo?: string; billingCycle?: string | null; billingDay?: number | null; invoicePrefix?: string | null; nextInvoiceNumber?: string | null }) =>
     apiClient<Client>('/api/clients', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  update: (id: string, data: Partial<{ name: string; accountHolder: string; accountHolderId: string | null; phone: string; mailingAddress: string; isActive: boolean; notes: string; defaultHourlyRate: string | null; invoicePayableTo: string | null; billingCycle: string | null; billingDay: number | null }>) =>
+  update: (id: string, data: Partial<{ name: string; accountHolder: string; accountHolderId: string | null; phone: string; mailingAddress: string; isActive: boolean; notes: string; defaultHourlyRate: string | null; invoicePayableTo: string | null; billingCycle: string | null; billingDay: number | null; invoicePrefix: string | null; nextInvoiceNumber: string | null }>) =>
     apiClient<Client>(`/api/clients/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),

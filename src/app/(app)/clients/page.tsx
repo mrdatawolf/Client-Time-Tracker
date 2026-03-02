@@ -38,6 +38,8 @@ export default function ClientsPage() {
   const [formPayableTo, setFormPayableTo] = useState('');
   const [formBillingCycle, setFormBillingCycle] = useState('');
   const [formBillingDay, setFormBillingDay] = useState('');
+  const [formInvoicePrefix, setFormInvoicePrefix] = useState('');
+  const [formNextInvoiceNumber, setFormNextInvoiceNumber] = useState('1000');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [partners, setPartners] = useState<User[]>([]);
@@ -88,6 +90,8 @@ export default function ClientsPage() {
     setFormPayableTo('');
     setFormBillingCycle('');
     setFormBillingDay('');
+    setFormInvoicePrefix('');
+    setFormNextInvoiceNumber('1000');
     setError('');
     setDialogOpen(true);
   }
@@ -103,6 +107,8 @@ export default function ClientsPage() {
     setFormPayableTo(client.invoicePayableTo || '');
     setFormBillingCycle(client.billingCycle || '');
     setFormBillingDay(client.billingDay || '');
+    setFormInvoicePrefix(client.invoicePrefix || '');
+    setFormNextInvoiceNumber(client.nextInvoiceNumber || '1000');
     setError('');
     setDialogOpen(true);
   }
@@ -128,6 +134,8 @@ export default function ClientsPage() {
           invoicePayableTo: formPayableTo.trim() || null,
           billingCycle: formBillingCycle || null,
           billingDay: formBillingCycle ? (parseInt(formBillingDay) || 1) : null,
+          invoicePrefix: formInvoicePrefix.trim() || null,
+          nextInvoiceNumber: formNextInvoiceNumber.trim() || '1000',
         });
       } else {
         await clientsApi.create({
@@ -141,6 +149,8 @@ export default function ClientsPage() {
           invoicePayableTo: formPayableTo.trim() || undefined,
           billingCycle: formBillingCycle || null,
           billingDay: formBillingCycle ? (parseInt(formBillingDay) || 1) : null,
+          invoicePrefix: formInvoicePrefix.trim() || null,
+          nextInvoiceNumber: formNextInvoiceNumber.trim() || '1000',
         });
       }
       setDialogOpen(false);
@@ -430,6 +440,35 @@ export default function ClientsPage() {
                 Invoices will be auto-generated as drafts on the scheduled day.
               </p>
             )}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="invoicePrefix">Invoice Prefix</Label>
+                <Input
+                  id="invoicePrefix"
+                  value={formInvoicePrefix}
+                  onChange={(e) => setFormInvoicePrefix(e.target.value.toUpperCase())}
+                  placeholder={formName ? formName.substring(0, 3).toUpperCase() : 'ABC'}
+                  maxLength={10}
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Default: first 3 letters of name
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="nextInvoiceNumber">Next Invoice #</Label>
+                <Input
+                  id="nextInvoiceNumber"
+                  type="number"
+                  min="1"
+                  value={formNextInvoiceNumber}
+                  onChange={(e) => setFormNextInvoiceNumber(e.target.value)}
+                  placeholder="1000"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Auto-increments after each invoice
+                </p>
+              </div>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="payableTo">Invoice &quot;Payable To&quot; Override</Label>
               <textarea
