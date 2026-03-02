@@ -48,22 +48,32 @@ export async function generateInvoice(options: GenerateInvoiceOptions): Promise<
     return null;
   }
 
-  // Generate sequential invoice number per client (e.g., ACM-0001, ACM-0002)
+  // Generate sequential invoice number per client (e.g., ACM-1000, ACM-1001)
   const [client] = await db.select().from(clients).where(eq(clients.id, clientId));
-  const prefix = (client?.name || 'INV').substring(0, 3).toUpperCase();
+  const prefix = client?.invoicePrefix || (client?.name || 'INV').substring(0, 3).toUpperCase();
+
+  // Use client's nextInvoiceNumber as the floor, but also scan existing invoices
+  // to handle manual edits or gaps
+  const clientNextNum = Number(client?.nextInvoiceNumber) || 1000;
   const existing = await db.select({ invoiceNumber: invoices.invoiceNumber })
     .from(invoices)
     .where(eq(invoices.clientId, clientId))
     .orderBy(desc(invoices.createdAt));
-  let nextNum = 1;
+  let maxExisting = 0;
   for (const row of existing) {
     const match = row.invoiceNumber.match(/-(\d+)$/);
     if (match) {
       const num = parseInt(match[1], 10);
-      if (num >= nextNum) nextNum = num + 1;
+      if (num > maxExisting) maxExisting = num;
     }
   }
+  const nextNum = Math.max(clientNextNum, maxExisting + 1);
   const invoiceNumber = `${prefix}-${String(nextNum).padStart(4, '0')}`;
+
+  // Update client's nextInvoiceNumber for next time
+  await db.update(clients)
+    .set({ nextInvoiceNumber: String(nextNum + 1), updatedAt: new Date() })
+    .where(eq(clients.id, clientId));
 
   // Create the invoice
   const [invoice] = await db.insert(invoices).values({

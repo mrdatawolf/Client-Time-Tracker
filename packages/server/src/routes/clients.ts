@@ -48,7 +48,7 @@ route.get('/', async (c) => {
 route.post('/', async (c) => {
   const db = await getDb();
   const body = await c.req.json();
-  const { name, accountHolder, accountHolderId, phone, mailingAddress, notes, defaultHourlyRate, invoicePayableTo, billingCycle, billingDay } = body;
+  const { name, accountHolder, accountHolderId, phone, mailingAddress, notes, defaultHourlyRate, invoicePayableTo, billingCycle, billingDay, invoicePrefix, nextInvoiceNumber } = body;
 
   if (!name) {
     return c.json({ error: 'Client name is required' }, 400);
@@ -85,6 +85,8 @@ route.post('/', async (c) => {
     invoicePayableTo: invoicePayableTo || null,
     billingCycle: billingCycle || null,
     billingDay: billingCycle ? (billingDay || '1') : null,
+    invoicePrefix: invoicePrefix || null,
+    nextInvoiceNumber: nextInvoiceNumber || '1000',
   }).returning();
 
   return c.json(client, 201);
@@ -111,7 +113,7 @@ route.put('/:id', async (c) => {
   const db = await getDb();
   const id = c.req.param('id');
   const body = await c.req.json();
-  const { name, accountHolder, accountHolderId, phone, mailingAddress, isActive, notes, defaultHourlyRate, invoicePayableTo, billingCycle, billingDay } = body;
+  const { name, accountHolder, accountHolderId, phone, mailingAddress, isActive, notes, defaultHourlyRate, invoicePayableTo, billingCycle, billingDay, invoicePrefix, nextInvoiceNumber } = body;
 
   // Validate billing fields
   if (billingCycle !== undefined && billingCycle !== null) {
@@ -146,6 +148,8 @@ route.put('/:id', async (c) => {
     }
   }
   if (billingDay !== undefined) updateData.billingDay = billingDay;
+  if (invoicePrefix !== undefined) updateData.invoicePrefix = invoicePrefix || null;
+  if (nextInvoiceNumber !== undefined) updateData.nextInvoiceNumber = nextInvoiceNumber;
 
   const [updated] = await db.update(clients)
     .set(updateData)

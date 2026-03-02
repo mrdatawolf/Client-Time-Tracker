@@ -95,8 +95,10 @@ app.get('/:id/pdf', async (c) => {
   // Date and invoice number (right-aligned)
   const headerY = doc.y;
   doc.fontSize(10).font('Helvetica')
+  const numericInvoicePart = invoice.invoiceNumber.replace(/^.*-/, '');
+  doc.fontSize(10).font('Helvetica')
     .text(formatInvoiceDate(invoice.dateIssued), 50, headerY)
-    .text(`Invoice No. ${invoice.invoiceNumber}`, 50, headerY + 14);
+    .text(`Invoice No. ${numericInvoicePart}`, 50, headerY + 14);
 
   // --- INVOICE title ---
   doc.moveDown(1.5);
@@ -182,7 +184,7 @@ app.get('/:id/pdf', async (c) => {
   return new Response(pdfBuffer, {
     headers: {
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="Invoice-${invoice.invoiceNumber}.pdf"`,
+      'Content-Disposition': `attachment; filename="${invoice.invoiceNumber}.pdf"`,
       'Content-Length': String(pdfBuffer.length),
     },
   });
