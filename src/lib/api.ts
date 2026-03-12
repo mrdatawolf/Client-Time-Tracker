@@ -276,6 +276,22 @@ export interface Payment {
   createdAt: string;
 }
 
+export interface InvoiceSplitEntry {
+  partnerId: string;
+  partnerName: string;
+  role: string;
+  amount: string;
+  isPaidOut: boolean;
+}
+
+export interface InvoiceSplitResponse {
+  splits: InvoiceSplitEntry[];
+  splitConfig: {
+    techPercent: number;
+    holderPercent: number;
+  };
+}
+
 export interface GenerateInvoiceRequest {
   clientId: string;
   dateFrom: string;
@@ -358,6 +374,15 @@ export const invoices = {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   },
+
+  getSplit: (id: string) =>
+    apiClient<InvoiceSplitResponse>(`/api/invoices/${id}/split`),
+
+  togglePayoutFlag: (id: string, partnerId: string) =>
+    apiClient<{ id: string; isPaid: boolean }>(`/api/invoices/${id}/split/toggle-paid`, {
+      method: 'POST',
+      body: JSON.stringify({ partnerId }),
+    }),
 };
 
 // --- Payments ---

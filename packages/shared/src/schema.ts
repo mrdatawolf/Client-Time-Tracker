@@ -184,6 +184,14 @@ export const autoInvoiceLog = pgTable('auto_invoice_log', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const invoicePayoutFlags = pgTable('invoice_payout_flags', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  invoiceId: uuid('invoice_id').notNull().references(() => invoices.id),
+  partnerId: uuid('partner_id').notNull().references(() => users.id),
+  isPaid: boolean('is_paid').notNull().default(false),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const appSettings = pgTable('app_settings', {
   key: text('key').primaryKey(),
   value: text('value').notNull(),
