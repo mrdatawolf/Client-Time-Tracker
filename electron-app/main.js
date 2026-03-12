@@ -88,7 +88,26 @@ function getJwtSecret() {
 
 function getDataDir() {
   if (app.isPackaged) {
-    return path.join(path.dirname(app.getPath('exe')), 'data');
+    // Store data in AppData (safe from installer upgrades/uninstalls)
+    const appDataDir = path.join(app.getPath('userData'), 'data');
+
+    // Migrate from old location (next to exe) if it exists and new location doesn't
+    const oldDataDir = path.join(path.dirname(app.getPath('exe')), 'data');
+    if (fs.existsSync(oldDataDir) && !fs.existsSync(appDataDir)) {
+      try {
+        fs.mkdirSync(path.dirname(appDataDir), { recursive: true });
+        fs.cpSync(oldDataDir, appDataDir, { recursive: true });
+        log(`Migrated data from ${oldDataDir} to ${appDataDir}`);
+        // Rename old dir so we don't re-migrate, but keep it as backup
+        fs.renameSync(oldDataDir, oldDataDir + '-migrated');
+        log(`Renamed old data dir to ${oldDataDir}-migrated`);
+      } catch (err) {
+        log(`Data migration failed: ${err.message} — falling back to old location`);
+        return oldDataDir;
+      }
+    }
+
+    return appDataDir;
   }
   return path.join(__dirname, '..', 'data');
 }
