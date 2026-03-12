@@ -367,6 +367,14 @@ export async function initializeSchema(client: PGlite): Promise<void> {
     ALTER TABLE sync_changelog ADD COLUMN IF NOT EXISTS error_message TEXT;
     ALTER TABLE sync_changelog ADD COLUMN IF NOT EXISTS last_attempt_at TIMESTAMPTZ;
 
+    CREATE TABLE IF NOT EXISTS invoice_payout_flags (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      invoice_id UUID NOT NULL REFERENCES invoices(id),
+      partner_id UUID NOT NULL REFERENCES users(id),
+      is_paid BOOLEAN NOT NULL DEFAULT false,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
     -- Fix invoice_line_items foreign key to allow deleting time entries
     DO $$ BEGIN
       ALTER TABLE invoice_line_items DROP CONSTRAINT IF EXISTS invoice_line_items_time_entry_id_fkey;

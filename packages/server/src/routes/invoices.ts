@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { getDb } from '@ctt/shared/db';
-import { invoices, invoiceLineItems, timeEntries, rateTiers, clients, appSettings, users, autoInvoiceLog } from '@ctt/shared/schema';
+import { invoices, invoiceLineItems, timeEntries, rateTiers, clients, appSettings, users, autoInvoiceLog, invoicePayoutFlags } from '@ctt/shared/schema';
 import { requireAdmin } from '../middleware/auth';
 import type { AppEnv } from '../types';
 import PDFDocument from 'pdfkit';
@@ -381,6 +381,175 @@ app.delete('/:invoiceId/line-items/:lineId', requireAdmin(), async (c) => {
 
   await db.delete(invoiceLineItems).where(eq(invoiceLineItems.id, lineId));
   return c.json({ success: true });
+});
+
+// --- Invoice Split Breakdown ---
+
+// Get earnings split for an invoice (who earns what from this invoice)
+app.get('/:id/split', requireAdmin(), async (c) => {
+  const db = await getDb();
+  const id = c.req.param('id');
+  const localClient = (db as any)._.session.client;
+
+  // Get invoice and client info
+  const rows = await db
+    .select({ invoice: invoices, client: clients })
+    .from(invoices)
+    .innerJoin(clients, eq(invoices.clientId, clients.id))
+    .where(eq(invoices.id, id));
+
+  if (rows.length === 0) return c.json({ error: 'Invoice not found' }, 404);
+  const { client } = rows[0];
+
+  // Get split settings
+  const settingsRes = await localClient.query(`
+    SELECT key, value FROM app_settings
+    WHERE key IN ('splitTechPercent', 'splitHolderPercent')
+  `);
+  const settings: Record<string, number> = {};
+  settingsRes.rows.forEach((r: any) => {
+    settings[r.key] = parseFloat(r.value) / 100;
+  });
+  const techSplit = settings.splitTechPercent || 0.73;
+  const holderSplit = settings.splitHolderPercent || 0.27;
+
+  // Get line items with their linked time entries to find techs
+  const lineItemsWithTechs = await localClient.query(`
+    SELECT
+      li.hours,
+      li.rate,
+      te.tech_id,
+      u.display_name as tech_name
+    FROM invoice_line_items li
+    LEFT JOIN time_entries te ON li.time_entry_id = te.id
+    LEFT JOIN users u ON te.tech_id = u.id
+    WHERE li.invoice_id = $1
+  `, [id]);
+
+  // Get account holder info
+  let holderName: string | null = null;
+  if (client.accountHolderId) {
+    const holderRes = await localClient.query(
+      `SELECT display_name FROM users WHERE id = $1`,
+      [client.accountHolderId]
+    );
+    if (holderRes.rows.length > 0) {
+      holderName = holderRes.rows[0].display_name;
+    }
+  }
+
+  // Calculate split per partner
+  const partnerEarnings = new Map<string, {
+    partnerId: string; partnerName: string; role: string; amount: number;
+  }>();
+
+  for (const row of lineItemsWithTechs.rows) {
+    const revenue = parseFloat(row.hours) * parseFloat(row.rate);
+    const techId = row.tech_id;
+
+    if (!techId) {
+      // Manual line item with no linked time entry - attribute to holder if exists
+      if (client.accountHolderId && holderName) {
+        if (!partnerEarnings.has(client.accountHolderId)) {
+          partnerEarnings.set(client.accountHolderId, {
+            partnerId: client.accountHolderId, partnerName: holderName,
+            role: 'Account Holder', amount: 0,
+          });
+        }
+        partnerEarnings.get(client.accountHolderId)!.amount += revenue;
+      }
+      continue;
+    }
+
+    // If tech is the same as account holder, they get 100%
+    if (techId === client.accountHolderId) {
+      if (!partnerEarnings.has(techId)) {
+        partnerEarnings.set(techId, {
+          partnerId: techId, partnerName: row.tech_name,
+          role: 'Tech & Holder', amount: 0,
+        });
+      }
+      partnerEarnings.get(techId)!.amount += revenue;
+    } else {
+      // Tech gets their split
+      if (!partnerEarnings.has(techId)) {
+        partnerEarnings.set(techId, {
+          partnerId: techId, partnerName: row.tech_name,
+          role: 'Tech', amount: 0,
+        });
+      }
+      partnerEarnings.get(techId)!.amount += revenue * techSplit;
+
+      // Holder gets their split
+      if (client.accountHolderId && holderName) {
+        if (!partnerEarnings.has(client.accountHolderId)) {
+          partnerEarnings.set(client.accountHolderId, {
+            partnerId: client.accountHolderId, partnerName: holderName,
+            role: 'Account Holder', amount: 0,
+          });
+        }
+        partnerEarnings.get(client.accountHolderId)!.amount += revenue * holderSplit;
+      }
+    }
+  }
+
+  // Get payout flags for this invoice
+  const payoutFlags = await db.select()
+    .from(invoicePayoutFlags)
+    .where(eq(invoicePayoutFlags.invoiceId, id));
+
+  const flagMap = new Map<string, boolean>();
+  for (const flag of payoutFlags) {
+    flagMap.set(flag.partnerId, flag.isPaid);
+  }
+
+  const splits = Array.from(partnerEarnings.values()).map(p => ({
+    partnerId: p.partnerId,
+    partnerName: p.partnerName,
+    role: p.role,
+    amount: p.amount.toFixed(2),
+    isPaidOut: flagMap.get(p.partnerId) || false,
+  }));
+
+  return c.json({
+    splits,
+    splitConfig: { techPercent: techSplit * 100, holderPercent: holderSplit * 100 },
+  });
+});
+
+// Toggle payout flag for a partner on an invoice
+app.post('/:id/split/toggle-paid', requireAdmin(), async (c) => {
+  const db = await getDb();
+  const invoiceId = c.req.param('id');
+  const body = await c.req.json();
+  const { partnerId } = body;
+
+  if (!partnerId) return c.json({ error: 'partnerId is required' }, 400);
+
+  // Check if flag exists
+  const existing = await db.select()
+    .from(invoicePayoutFlags)
+    .where(and(
+      eq(invoicePayoutFlags.invoiceId, invoiceId),
+      eq(invoicePayoutFlags.partnerId, partnerId),
+    ));
+
+  if (existing.length > 0) {
+    // Toggle it
+    const [updated] = await db.update(invoicePayoutFlags)
+      .set({ isPaid: !existing[0].isPaid, updatedAt: new Date() })
+      .where(eq(invoicePayoutFlags.id, existing[0].id))
+      .returning();
+    return c.json(updated);
+  } else {
+    // Create it as paid
+    const [created] = await db.insert(invoicePayoutFlags).values({
+      invoiceId,
+      partnerId,
+      isPaid: true,
+    }).returning();
+    return c.json(created);
+  }
 });
 
 export default app;

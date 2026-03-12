@@ -19,6 +19,7 @@ import {
   type Invoice,
   type InvoiceLineItem,
   type Payment,
+  type InvoiceSplitEntry,
 } from '@/lib/api';
 import { formatCurrency, formatDate, toISODate } from '@/lib/utils';
 import Link from 'next/link';
@@ -44,6 +45,7 @@ export default function InvoiceDetailPage() {
 
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [paymentList, setPaymentList] = useState<Payment[]>([]);
+  const [splitData, setSplitData] = useState<InvoiceSplitEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
 
@@ -74,12 +76,14 @@ export default function InvoiceDetailPage() {
 
   const loadInvoice = useCallback(async () => {
     try {
-      const [inv, pmts] = await Promise.all([
+      const [inv, pmts, splitRes] = await Promise.all([
         invoicesApi.get(id),
         paymentsApi.list(id),
+        invoicesApi.getSplit(id).catch(() => ({ splits: [], splitConfig: { techPercent: 73, holderPercent: 27 } })),
       ]);
       setInvoice(inv);
       setPaymentList(pmts);
+      setSplitData(splitRes.splits);
     } catch (err) {
       console.error('Failed to load invoice:', err);
     } finally {
@@ -253,6 +257,18 @@ export default function InvoiceDetailPage() {
     }
   }
 
+  async function handleTogglePayout(partnerId: string) {
+    try {
+      await invoicesApi.togglePayoutFlag(id, partnerId);
+      // Update local state optimistically
+      setSplitData(prev => prev.map(s =>
+        s.partnerId === partnerId ? { ...s, isPaidOut: !s.isPaidOut } : s
+      ));
+    } catch (err) {
+      console.error('Failed to toggle payout flag:', err);
+    }
+  }
+
   if (loading) {
     return (
       <div className="p-8 text-center text-gray-500">Loading invoice...</div>
@@ -383,26 +399,67 @@ export default function InvoiceDetailPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="text-sm text-gray-500 mb-1">Invoice Total</div>
-          <div className="text-xl font-bold text-gray-900">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Invoice Total</div>
+          <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
             {formatCurrency(invoice.total || 0)}
           </div>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="text-sm text-gray-500 mb-1">Paid</div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+            {invoice.status === 'paid' ? 'Paid — Split' : 'Paid'}
+          </div>
           <div className="text-xl font-bold text-green-600">
             {formatCurrency(totalPaid)}
           </div>
+          {invoice.status === 'paid' && splitData.length > 0 && (
+            <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700 space-y-1.5">
+              {splitData.map((s) => (
+                <label
+                  key={s.partnerId}
+                  className="flex items-center gap-2 text-sm cursor-pointer group"
+                >
+                  <input
+                    type="checkbox"
+                    checked={s.isPaidOut}
+                    onChange={() => handleTogglePayout(s.partnerId)}
+                    className="rounded border-gray-300 dark:border-gray-600 text-green-600 focus:ring-green-500"
+                  />
+                  <span className={`flex-1 ${s.isPaidOut ? 'text-green-600 line-through' : 'text-gray-700 dark:text-gray-300'}`}>
+                    {s.partnerName}
+                  </span>
+                  <span className={`font-medium ${s.isPaidOut ? 'text-green-600' : 'text-gray-900 dark:text-gray-100'}`}>
+                    {formatCurrency(s.amount)}
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="text-sm text-gray-500 mb-1">Remaining</div>
-          <div className={`text-xl font-bold ${remaining > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
-            {formatCurrency(remaining > 0 ? remaining : 0)}
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+            {invoice.status !== 'paid' && invoice.status !== 'void' ? 'Expected Split' : 'Remaining'}
           </div>
+          {invoice.status !== 'paid' && invoice.status !== 'void' && splitData.length > 0 ? (
+            <div className="space-y-1.5">
+              {splitData.map((s) => (
+                <div key={s.partnerId} className="flex items-center justify-between text-sm">
+                  <div>
+                    <span className="text-gray-700 dark:text-gray-300">{s.partnerName}</span>
+                    <span className="text-gray-400 dark:text-gray-500 text-xs ml-1">({s.role})</span>
+                  </div>
+                  <span className="font-medium text-amber-600">{formatCurrency(s.amount)}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className={`text-xl font-bold ${remaining > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
+              {formatCurrency(remaining > 0 ? remaining : 0)}
+            </div>
+          )}
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="text-sm text-gray-500 mb-1">Dates</div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Dates</div>
           <div className="text-sm space-y-0.5">
             <div>Issued: {renderEditableField('dateIssued', 'Issued', invoice.dateIssued, formatDate(invoice.dateIssued), 'date')}</div>
             <div>Due: {renderEditableField('dateDue', 'Due', invoice.dateDue || '', invoice.dateDue ? formatDate(invoice.dateDue) : 'Not set', 'date')}</div>
