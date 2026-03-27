@@ -133,7 +133,7 @@ export default function Dashboard() {
           onComplete={handleOnboardingComplete}
         />
       )}
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-6 md:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
             Welcome back, {user?.displayName || 'User'}
@@ -234,32 +234,34 @@ export default function Dashboard() {
             </Link>
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Client</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Job Type</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Tech</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Hours</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-              {recentEntries.map((entry) => (
-                <tr key={entry.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                  <td className="px-6 py-3 text-gray-600 dark:text-gray-400">{entry.date}</td>
-                  <td className="px-6 py-3 font-medium dark:text-gray-200">{entry.client?.name || '-'}</td>
-                  <td className="px-6 py-3 text-gray-600 dark:text-gray-400">{entry.jobType?.name || '-'}</td>
-                  <td className="px-6 py-3 text-gray-600 dark:text-gray-400">{entry.tech?.displayName || '-'}</td>
-                  <td className="px-6 py-3 text-right dark:text-gray-300">{entry.hours}h</td>
-                  <td className="px-6 py-3 text-right font-medium dark:text-gray-200">
-                    {entry.total ? formatCurrency(parseFloat(entry.total)) : '-'}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                  <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
+                  <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Client</th>
+                  <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">Job Type</th>
+                  <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden lg:table-cell">Tech</th>
+                  <th className="px-3 md:px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Hours</th>
+                  <th className="px-3 md:px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                {recentEntries.map((entry) => (
+                  <tr key={entry.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-3 md:px-6 py-3 text-gray-600 dark:text-gray-400">{entry.date}</td>
+                    <td className="px-3 md:px-6 py-3 font-medium dark:text-gray-200">{entry.client?.name || '-'}</td>
+                    <td className="px-3 md:px-6 py-3 text-gray-600 dark:text-gray-400 hidden sm:table-cell">{entry.jobType?.name || '-'}</td>
+                    <td className="px-3 md:px-6 py-3 text-gray-600 dark:text-gray-400 hidden lg:table-cell">{entry.tech?.displayName || '-'}</td>
+                    <td className="px-3 md:px-6 py-3 text-right dark:text-gray-300">{entry.hours}h</td>
+                    <td className="px-3 md:px-6 py-3 text-right font-medium dark:text-gray-200">
+                      {entry.total ? formatCurrency(parseFloat(entry.total)) : '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
