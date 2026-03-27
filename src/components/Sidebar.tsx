@@ -20,6 +20,8 @@ import {
   RefreshCw,
   Wifi,
   Ban,
+  Menu,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { clearToken, getUser } from '@/lib/api-client';
@@ -45,11 +47,17 @@ const adminItems = [
 export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const user = getUser();
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [syncing, setSyncing] = useState(false);
 
   const isAdminOrPartner = user?.role === 'admin' || user?.role === 'partner';
+
+  // Close mobile drawer on navigation
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   // Load sync status and poll
   useEffect(() => {
@@ -97,13 +105,8 @@ export function Sidebar() {
     window.location.href = '/login';
   };
 
-  return (
-    <aside
-      className={cn(
-        'flex flex-col h-screen bg-gray-900 text-gray-100 transition-all duration-200',
-        collapsed ? 'w-16' : 'w-60'
-      )}
-    >
+  const sidebarContent = (
+    <>
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-700">
         {!collapsed && (
@@ -112,16 +115,26 @@ export function Sidebar() {
             <span className="font-semibold text-lg">Time Tracker</span>
           </div>
         )}
+        {/* Desktop: collapse toggle. Mobile: close button */}
         <button
-          onClick={() => setCollapsed(!collapsed)}
+          onClick={() => {
+            if (mobileOpen) setMobileOpen(false);
+            else setCollapsed(!collapsed);
+          }}
           className="p-1 rounded hover:bg-gray-700 transition-colors"
         >
-          {collapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+          {mobileOpen ? (
+            <X className="w-5 h-5" />
+          ) : collapsed ? (
+            <ChevronRight className="w-5 h-5" />
+          ) : (
+            <ChevronLeft className="w-5 h-5" />
+          )}
         </button>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 py-4">
+      <nav className="flex-1 py-4 overflow-y-auto">
         <ul className="space-y-1 px-2">
           {navItems.map((item) => {
             const isActive = pathname === item.href;
@@ -135,10 +148,10 @@ export function Sidebar() {
                       ? 'bg-blue-600 text-white'
                       : 'text-gray-300 hover:bg-gray-800 hover:text-white'
                   )}
-                  title={collapsed ? item.label : undefined}
+                  title={collapsed && !mobileOpen ? item.label : undefined}
                 >
                   <item.icon className="w-5 h-5 shrink-0" />
-                  {!collapsed && <span>{item.label}</span>}
+                  {(!collapsed || mobileOpen) && <span>{item.label}</span>}
                 </Link>
               </li>
             );
@@ -147,7 +160,7 @@ export function Sidebar() {
 
         {(user?.role === 'admin' || user?.role === 'partner') && (
           <>
-            {!collapsed && (
+            {(!collapsed || mobileOpen) && (
               <div className="px-5 pt-6 pb-2">
                 <span className="text-xs font-semibold text-gray-500 uppercase">Admin</span>
               </div>
@@ -165,10 +178,10 @@ export function Sidebar() {
                           ? 'bg-blue-600 text-white'
                           : 'text-gray-300 hover:bg-gray-800 hover:text-white'
                       )}
-                      title={collapsed ? item.label : undefined}
+                      title={collapsed && !mobileOpen ? item.label : undefined}
                     >
                       <item.icon className="w-5 h-5 shrink-0" />
-                      {!collapsed && <span>{item.label}</span>}
+                      {(!collapsed || mobileOpen) && <span>{item.label}</span>}
                     </Link>
                   </li>
                 );
@@ -183,16 +196,16 @@ export function Sidebar() {
         <div className="border-t border-gray-700 px-3 py-2">
           <div className="flex items-center gap-2">
             <SidebarSyncIndicator state={syncing ? 'syncing' : syncStatus.state} />
-            {!collapsed && (
+            {(!collapsed || mobileOpen) && (
               <span className="text-xs text-gray-400 truncate flex-1">
-                {syncing 
-                  ? 'Syncing...' 
-                  : syncStatus.state === 'idle' 
-                    ? `Synced${syncStatus.pendingCount > 0 ? ` (${syncStatus.pendingCount})` : ''}` 
-                    : syncStatus.state === 'error' 
-                      ? 'Sync error' 
-                      : syncStatus.state === 'offline' 
-                        ? 'Offline' 
+                {syncing
+                  ? 'Syncing...'
+                  : syncStatus.state === 'idle'
+                    ? `Synced${syncStatus.pendingCount > 0 ? ` (${syncStatus.pendingCount})` : ''}`
+                    : syncStatus.state === 'error'
+                      ? 'Sync error'
+                      : syncStatus.state === 'offline'
+                        ? 'Offline'
                         : 'Syncing...'}
               </span>
             )}
@@ -209,8 +222,8 @@ export function Sidebar() {
       )}
 
       {/* Theme toggle */}
-      <div className={cn('border-t border-gray-700 px-3 py-2', collapsed && 'flex justify-center')}>
-        <ThemeToggle collapsed={collapsed} />
+      <div className={cn('border-t border-gray-700 px-3 py-2', collapsed && !mobileOpen && 'flex justify-center')}>
+        <ThemeToggle collapsed={collapsed && !mobileOpen} />
       </div>
 
       {/* User section */}
@@ -219,7 +232,7 @@ export function Sidebar() {
           <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-sm font-medium shrink-0">
             {user?.displayName?.charAt(0) || '?'}
           </div>
-          {!collapsed && (
+          {(!collapsed || mobileOpen) && (
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{user?.displayName || 'User'}</p>
               <p className="text-xs text-gray-400 truncate">{user?.role || 'basic'}</p>
@@ -234,7 +247,48 @@ export function Sidebar() {
           </button>
         </div>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Mobile hamburger button - fixed at top left */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="md:hidden fixed top-3 left-3 z-50 p-2 rounded-lg bg-gray-900 text-gray-100 shadow-lg"
+        aria-label="Open menu"
+      >
+        <Menu className="w-5 h-5" />
+      </button>
+
+      {/* Mobile overlay backdrop */}
+      {mobileOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-40 bg-black/50"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* Mobile drawer */}
+      <aside
+        className={cn(
+          'md:hidden fixed inset-y-0 left-0 z-50 flex flex-col w-64 bg-gray-900 text-gray-100 transition-transform duration-200',
+          mobileOpen ? 'translate-x-0' : '-translate-x-full'
+        )}
+      >
+        {sidebarContent}
+      </aside>
+
+      {/* Desktop sidebar */}
+      <aside
+        className={cn(
+          'hidden md:flex flex-col h-screen bg-gray-900 text-gray-100 transition-all duration-200',
+          collapsed ? 'w-16' : 'w-60'
+        )}
+      >
+        {sidebarContent}
+      </aside>
+    </>
   );
 }
 

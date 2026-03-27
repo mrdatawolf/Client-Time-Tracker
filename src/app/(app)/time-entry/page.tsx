@@ -25,7 +25,7 @@ export default function TimeEntryPage() {
         <ClientSelector
           value={clientId}
           onChange={setClientId}
-          className="w-64"
+          className="w-full sm:w-64"
           allowAll
         />
         <DateRangePicker

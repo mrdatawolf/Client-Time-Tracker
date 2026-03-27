@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useSyncExternalStore } from 'react';
 import { Plus, CheckSquare, Square, Receipt, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { timeEntries as timeEntriesApi, type TimeEntry } from '@/lib/api';
@@ -15,6 +15,15 @@ interface TimeEntryGridProps {
 }
 
 const SHORT_DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+// SSR-safe mobile detection
+const MD_BREAKPOINT = 768;
+const subscribe = (cb: () => void) => { window.addEventListener('resize', cb); return () => window.removeEventListener('resize', cb); };
+const getIsMobile = () => window.innerWidth < MD_BREAKPOINT;
+const getIsMobileServer = () => false;
+function useIsMobile() {
+  return useSyncExternalStore(subscribe, getIsMobile, getIsMobileServer);
+}
 
 function getDatesInRange(from: string, to: string): Date[] {
   const dates: Date[] = [];
@@ -69,7 +78,8 @@ export default function TimeEntryGrid({ clientId, dateFrom, dateTo }: TimeEntryG
   // Determine if we can use the multi-row week grid or fall back to list
   const weekAligned = useMemo(() => isWeekAligned(dateFrom, dateTo), [dateFrom, dateTo]);
   const weeks = useMemo(() => weekAligned ? groupIntoWeeks(dates) : [], [weekAligned, dates]);
-  const useListView = !weekAligned || dates.length > 35; // list for non-week-aligned or > 5 weeks
+  const isMobile = useIsMobile();
+  const useListView = isMobile || !weekAligned || dates.length > 35; // list on mobile, non-week-aligned, or > 5 weeks
 
   const loadEntries = useCallback(async () => {
     if (!dateFrom || !dateTo) return;

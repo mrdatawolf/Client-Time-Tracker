@@ -113,7 +113,7 @@ export default function AppLayout({
         </div>
       )}
       <Sidebar />
-      <main className={`flex-1 overflow-auto bg-gray-50 dark:bg-gray-900 p-6 ${isDemo ? 'pt-12' : ''}`}>
+      <main className={`flex-1 overflow-auto bg-gray-50 dark:bg-gray-900 p-3 md:p-6 ${isDemo ? 'pt-12' : 'pt-14 md:pt-6'}`}>
         {children}
       </main>
     </div>
