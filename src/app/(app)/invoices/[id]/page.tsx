@@ -20,6 +20,7 @@ import {
   type InvoiceLineItem,
   type Payment,
   type InvoiceSplitEntry,
+  type InvoiceSplitResponse,
 } from '@/lib/api';
 import { formatCurrency, formatDate, toISODate } from '@/lib/utils';
 import Link from 'next/link';
@@ -35,7 +36,7 @@ const STATUS_TRANSITIONS: Record<string, { label: string; value: string }[]> = {
   draft: [{ label: 'Mark as Sent', value: 'sent' }, { label: 'Void', value: 'void' }],
   sent: [{ label: 'Void', value: 'void' }],
   paid: [],
-  void: [],
+  void: [{ label: 'Reopen as Draft', value: 'draft' }],
 };
 
 export default function InvoiceDetailPage() {
@@ -46,6 +47,7 @@ export default function InvoiceDetailPage() {
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [paymentList, setPaymentList] = useState<Payment[]>([]);
   const [splitData, setSplitData] = useState<InvoiceSplitEntry[]>([]);
+  const [partsTotal, setPartsTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
 
@@ -60,11 +62,17 @@ export default function InvoiceDetailPage() {
   const [editLineRate, setEditLineRate] = useState('');
   const [savingLine, setSavingLine] = useState(false);
 
-  // Add line item
+  // Add labor line item
   const [addingLine, setAddingLine] = useState(false);
   const [newLineDesc, setNewLineDesc] = useState('');
   const [newLineHours, setNewLineHours] = useState('');
   const [newLineRate, setNewLineRate] = useState('');
+
+  // Add part/expense line item
+  const [addingPart, setAddingPart] = useState(false);
+  const [newPartDesc, setNewPartDesc] = useState('');
+  const [newPartQty, setNewPartQty] = useState('');
+  const [newPartPrice, setNewPartPrice] = useState('');
 
   // Payment form state
   const [payAmount, setPayAmount] = useState('');
@@ -79,11 +87,12 @@ export default function InvoiceDetailPage() {
       const [inv, pmts, splitRes] = await Promise.all([
         invoicesApi.get(id),
         paymentsApi.list(id),
-        invoicesApi.getSplit(id).catch(() => ({ splits: [], splitConfig: { techPercent: 73, holderPercent: 27 } })),
+        invoicesApi.getSplit(id).catch((): InvoiceSplitResponse => ({ splits: [], splitConfig: { techPercent: 73, holderPercent: 27 }, partsTotal: '0' })),
       ]);
       setInvoice(inv);
       setPaymentList(pmts);
       setSplitData(splitRes.splits);
+      setPartsTotal(parseFloat(splitRes.partsTotal || '0'));
     } catch (err) {
       console.error('Failed to load invoice:', err);
     } finally {
@@ -170,6 +179,32 @@ export default function InvoiceDetailPage() {
       loadInvoice();
     } catch (err) {
       console.error('Failed to add line item:', err);
+    } finally {
+      setSavingLine(false);
+    }
+  }
+
+  function openAddPart() {
+    setAddingPart(true);
+    setNewPartDesc('');
+    setNewPartQty('1');
+    setNewPartPrice('');
+  }
+
+  async function saveNewPart() {
+    if (!newPartDesc.trim() || !newPartQty || !newPartPrice) return;
+    setSavingLine(true);
+    try {
+      await invoicesApi.addLineItem(id, {
+        description: newPartDesc.trim(),
+        hours: newPartQty,
+        rate: newPartPrice,
+        lineItemType: 'part',
+      });
+      setAddingPart(false);
+      loadInvoice();
+    } catch (err) {
+      console.error('Failed to add part:', err);
     } finally {
       setSavingLine(false);
     }
@@ -285,6 +320,9 @@ export default function InvoiceDetailPage() {
   const remaining = (invoice.total || 0) - totalPaid;
   const transitions = STATUS_TRANSITIONS[invoice.status] || [];
   const isEditable = invoice.status === 'draft' || invoice.status === 'sent';
+
+  const laborLines = invoice.lineItems?.filter(l => l.lineItemType !== 'part') ?? [];
+  const partLines = invoice.lineItems?.filter(l => l.lineItemType === 'part') ?? [];
 
   // Inline editable field helper
   function renderEditableField(
@@ -407,13 +445,16 @@ export default function InvoiceDetailPage() {
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
           <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-            {invoice.status === 'paid' ? 'Paid — Split' : 'Paid'}
+            {invoice.status === 'paid' ? 'Paid — Split' : invoice.status === 'sent' ? 'Early Payouts' : 'Paid'}
           </div>
           <div className="text-xl font-bold text-green-600">
             {formatCurrency(totalPaid)}
           </div>
-          {invoice.status === 'paid' && splitData.length > 0 && (
+          {(invoice.status === 'paid' || invoice.status === 'sent') && splitData.length > 0 && (
             <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700 space-y-1.5">
+              {invoice.status === 'sent' && (
+                <p className="text-xs text-gray-400 dark:text-gray-500 mb-1.5">Check off partners paid before client pays.</p>
+              )}
               {splitData.map((s) => (
                 <label
                   key={s.partnerId}
@@ -451,6 +492,12 @@ export default function InvoiceDetailPage() {
                   <span className="font-medium text-amber-600">{formatCurrency(s.amount)}</span>
                 </div>
               ))}
+              {partsTotal > 0 && (
+                <div className="flex items-center justify-between text-sm pt-1 border-t border-gray-100 dark:border-gray-700">
+                  <span className="text-gray-400 dark:text-gray-500 text-xs italic">Parts (pass-through)</span>
+                  <span className="font-medium text-gray-500">{formatCurrency(partsTotal)}</span>
+                </div>
+              )}
             </div>
           ) : (
             <div className={`text-xl font-bold ${remaining > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
@@ -505,34 +552,34 @@ export default function InvoiceDetailPage() {
         )}
       </div>
 
-      {/* Line Items */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden mb-6">
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">Line Items</h2>
+      {/* Labor Line Items */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden mb-4">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Labor</h2>
           {isEditable && !addingLine && (
             <Button size="sm" variant="outline" onClick={openAddLine}>
               <Plus className="w-4 h-4 mr-1" />
-              Add Line
+              Add Labor Line
             </Button>
           )}
         </div>
-        {!invoice.lineItems || invoice.lineItems.length === 0 ? (
-          <div className="p-6 text-center text-gray-500">No line items</div>
+        {laborLines.length === 0 && !addingLine ? (
+          <div className="p-6 text-center text-gray-500 dark:text-gray-400">No labor line items</div>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase w-24">Hours</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase w-28">Rate</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase w-28">Amount</th>
+              <tr className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Description</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-24">Hours</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-28">Rate</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-28">Amount</th>
                 {isEditable && (
-                  <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase w-20">Actions</th>
+                  <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-20">Actions</th>
                 )}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {invoice.lineItems.map((line) => {
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+              {laborLines.map((line) => {
                 const isEditingThis = editingLineId === line.id;
                 const lineTotal = isEditingThis
                   ? (parseFloat(editLineHours) || 0) * (parseFloat(editLineRate) || 0)
@@ -540,59 +587,24 @@ export default function InvoiceDetailPage() {
 
                 if (isEditingThis) {
                   return (
-                    <tr key={line.id} className="bg-blue-50/50">
+                    <tr key={line.id} className="bg-blue-50/50 dark:bg-blue-900/20">
                       <td className="px-6 py-2">
-                        <Input
-                          value={editLineDesc}
-                          onChange={(e) => setEditLineDesc(e.target.value)}
-                          className="h-8 text-sm"
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') saveLineEdit();
-                            if (e.key === 'Escape') cancelLineEdit();
-                          }}
-                        />
+                        <Input value={editLineDesc} onChange={(e) => setEditLineDesc(e.target.value)} className="h-8 text-sm" autoFocus
+                          onKeyDown={(e) => { if (e.key === 'Enter') saveLineEdit(); if (e.key === 'Escape') cancelLineEdit(); }} />
                       </td>
                       <td className="px-6 py-2">
-                        <Input
-                          type="number"
-                          step="0.25"
-                          min="0"
-                          value={editLineHours}
-                          onChange={(e) => setEditLineHours(e.target.value)}
-                          className="h-8 text-sm text-right w-20 ml-auto"
-                        />
+                        <Input type="number" step="0.25" min="0" value={editLineHours} onChange={(e) => setEditLineHours(e.target.value)} className="h-8 text-sm text-right w-20 ml-auto" />
                       </td>
                       <td className="px-6 py-2">
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={editLineRate}
-                          onChange={(e) => setEditLineRate(e.target.value)}
-                          className="h-8 text-sm text-right w-24 ml-auto"
-                        />
+                        <Input type="number" step="0.01" min="0" value={editLineRate} onChange={(e) => setEditLineRate(e.target.value)} className="h-8 text-sm text-right w-24 ml-auto" />
                       </td>
-                      <td className="px-6 py-2 text-right font-medium text-gray-500">
-                        {formatCurrency(lineTotal)}
-                      </td>
+                      <td className="px-6 py-2 text-right font-medium text-gray-500">{formatCurrency(lineTotal)}</td>
                       <td className="px-3 py-2 text-right">
                         <div className="flex items-center justify-end gap-0.5">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            onClick={saveLineEdit}
-                            disabled={savingLine}
-                          >
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={saveLineEdit} disabled={savingLine}>
                             <Check className="w-3.5 h-3.5 text-green-600" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            onClick={cancelLineEdit}
-                          >
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={cancelLineEdit}>
                             <X className="w-3.5 h-3.5 text-gray-400" />
                           </Button>
                         </div>
@@ -602,28 +614,18 @@ export default function InvoiceDetailPage() {
                 }
 
                 return (
-                  <tr key={line.id} className="group hover:bg-gray-50">
-                    <td className="px-6 py-3 text-gray-600">{line.description}</td>
-                    <td className="px-6 py-3 text-right">{Number(line.hours).toFixed(2)}h</td>
-                    <td className="px-6 py-3 text-right">{formatCurrency(Number(line.rate))}</td>
-                    <td className="px-6 py-3 text-right font-medium">{formatCurrency(lineTotal)}</td>
+                  <tr key={line.id} className="group hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-6 py-3 text-gray-600 dark:text-gray-300">{line.description}</td>
+                    <td className="px-6 py-3 text-right dark:text-gray-300">{Number(line.hours).toFixed(2)}h</td>
+                    <td className="px-6 py-3 text-right dark:text-gray-300">{formatCurrency(Number(line.rate))}</td>
+                    <td className="px-6 py-3 text-right font-medium dark:text-gray-200">{formatCurrency(lineTotal)}</td>
                     {isEditable && (
                       <td className="px-3 py-3 text-right">
                         <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            onClick={() => startEditLine(line)}
-                          >
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => startEditLine(line)}>
                             <Pencil className="w-3 h-3 text-gray-400" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            onClick={() => handleDeleteLine(line.id)}
-                          >
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDeleteLine(line.id)}>
                             <Trash2 className="w-3 h-3 text-red-400" />
                           </Button>
                         </div>
@@ -633,62 +635,27 @@ export default function InvoiceDetailPage() {
                 );
               })}
 
-              {/* Add new line row */}
               {addingLine && (
-                <tr className="bg-green-50/50">
+                <tr className="bg-green-50/50 dark:bg-green-900/20">
                   <td className="px-6 py-2">
-                    <Input
-                      value={newLineDesc}
-                      onChange={(e) => setNewLineDesc(e.target.value)}
-                      placeholder="Description of work..."
-                      className="h-8 text-sm"
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') saveNewLine();
-                        if (e.key === 'Escape') setAddingLine(false);
-                      }}
-                    />
+                    <Input value={newLineDesc} onChange={(e) => setNewLineDesc(e.target.value)} placeholder="Description of work..."
+                      className="h-8 text-sm" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') saveNewLine(); if (e.key === 'Escape') setAddingLine(false); }} />
                   </td>
                   <td className="px-6 py-2">
-                    <Input
-                      type="number"
-                      step="0.25"
-                      min="0"
-                      value={newLineHours}
-                      onChange={(e) => setNewLineHours(e.target.value)}
-                      className="h-8 text-sm text-right w-20 ml-auto"
-                    />
+                    <Input type="number" step="0.25" min="0" value={newLineHours} onChange={(e) => setNewLineHours(e.target.value)} className="h-8 text-sm text-right w-20 ml-auto" />
                   </td>
                   <td className="px-6 py-2">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={newLineRate}
-                      onChange={(e) => setNewLineRate(e.target.value)}
-                      className="h-8 text-sm text-right w-24 ml-auto"
-                    />
+                    <Input type="number" step="0.01" min="0" value={newLineRate} onChange={(e) => setNewLineRate(e.target.value)} className="h-8 text-sm text-right w-24 ml-auto" />
                   </td>
                   <td className="px-6 py-2 text-right font-medium text-gray-500">
                     {formatCurrency((parseFloat(newLineHours) || 0) * (parseFloat(newLineRate) || 0))}
                   </td>
                   <td className="px-3 py-2 text-right">
                     <div className="flex items-center justify-end gap-0.5">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0"
-                        onClick={saveNewLine}
-                        disabled={savingLine}
-                      >
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={saveNewLine} disabled={savingLine}>
                         <Check className="w-3.5 h-3.5 text-green-600" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0"
-                        onClick={() => setAddingLine(false)}
-                      >
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setAddingLine(false)}>
                         <X className="w-3.5 h-3.5 text-gray-400" />
                       </Button>
                     </div>
@@ -697,9 +664,141 @@ export default function InvoiceDetailPage() {
               )}
             </tbody>
             <tfoot>
-              <tr className="bg-gray-50 border-t border-gray-200">
-                <td colSpan={isEditable ? 4 : 3} className="px-6 py-3 text-right font-medium text-gray-700">Total</td>
-                <td className={`px-6 py-3 text-right font-bold text-gray-900 ${isEditable ? '' : ''}`}>
+              <tr className="bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+                <td colSpan={isEditable ? 4 : 3} className="px-6 py-3 text-right font-medium text-gray-700 dark:text-gray-300">Labor Total</td>
+                <td className="px-6 py-3 text-right font-bold text-gray-900 dark:text-gray-100">
+                  {formatCurrency(laborLines.reduce((s, l) => s + Number(l.hours) * Number(l.rate), 0))}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        )}
+      </div>
+
+      {/* Parts & Expenses */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden mb-6">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Parts &amp; Expenses</h2>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Pass-through costs — not included in partner split</p>
+          </div>
+          {isEditable && !addingPart && (
+            <Button size="sm" variant="outline" onClick={openAddPart}>
+              <Plus className="w-4 h-4 mr-1" />
+              Add Part
+            </Button>
+          )}
+        </div>
+        {partLines.length === 0 && !addingPart ? (
+          <div className="p-6 text-center text-gray-500 dark:text-gray-400">No parts or expenses</div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Description</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-24">Qty</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-28">Unit Price</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-28">Amount</th>
+                {isEditable && (
+                  <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-20">Actions</th>
+                )}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+              {partLines.map((line) => {
+                const isEditingThis = editingLineId === line.id;
+                const lineTotal = isEditingThis
+                  ? (parseFloat(editLineHours) || 0) * (parseFloat(editLineRate) || 0)
+                  : Number(line.hours) * Number(line.rate);
+
+                if (isEditingThis) {
+                  return (
+                    <tr key={line.id} className="bg-blue-50/50 dark:bg-blue-900/20">
+                      <td className="px-6 py-2">
+                        <Input value={editLineDesc} onChange={(e) => setEditLineDesc(e.target.value)} className="h-8 text-sm" autoFocus
+                          onKeyDown={(e) => { if (e.key === 'Enter') saveLineEdit(); if (e.key === 'Escape') cancelLineEdit(); }} />
+                      </td>
+                      <td className="px-6 py-2">
+                        <Input type="number" step="1" min="0" value={editLineHours} onChange={(e) => setEditLineHours(e.target.value)} className="h-8 text-sm text-right w-20 ml-auto" />
+                      </td>
+                      <td className="px-6 py-2">
+                        <Input type="number" step="0.01" min="0" value={editLineRate} onChange={(e) => setEditLineRate(e.target.value)} className="h-8 text-sm text-right w-24 ml-auto" />
+                      </td>
+                      <td className="px-6 py-2 text-right font-medium text-gray-500">{formatCurrency(lineTotal)}</td>
+                      <td className="px-3 py-2 text-right">
+                        <div className="flex items-center justify-end gap-0.5">
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={saveLineEdit} disabled={savingLine}>
+                            <Check className="w-3.5 h-3.5 text-green-600" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={cancelLineEdit}>
+                            <X className="w-3.5 h-3.5 text-gray-400" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }
+
+                return (
+                  <tr key={line.id} className="group hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-6 py-3 text-gray-600 dark:text-gray-300">{line.description}</td>
+                    <td className="px-6 py-3 text-right dark:text-gray-300">{Number(line.hours).toFixed(0)}</td>
+                    <td className="px-6 py-3 text-right dark:text-gray-300">{formatCurrency(Number(line.rate))}</td>
+                    <td className="px-6 py-3 text-right font-medium dark:text-gray-200">{formatCurrency(lineTotal)}</td>
+                    {isEditable && (
+                      <td className="px-3 py-3 text-right">
+                        <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => startEditLine(line)}>
+                            <Pencil className="w-3 h-3 text-gray-400" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDeleteLine(line.id)}>
+                            <Trash2 className="w-3 h-3 text-red-400" />
+                          </Button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+
+              {addingPart && (
+                <tr className="bg-orange-50/50 dark:bg-orange-900/20">
+                  <td className="px-6 py-2">
+                    <Input value={newPartDesc} onChange={(e) => setNewPartDesc(e.target.value)} placeholder="Part or expense description..."
+                      className="h-8 text-sm" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') saveNewPart(); if (e.key === 'Escape') setAddingPart(false); }} />
+                  </td>
+                  <td className="px-6 py-2">
+                    <Input type="number" step="1" min="0" value={newPartQty} onChange={(e) => setNewPartQty(e.target.value)} className="h-8 text-sm text-right w-20 ml-auto" />
+                  </td>
+                  <td className="px-6 py-2">
+                    <Input type="number" step="0.01" min="0" value={newPartPrice} onChange={(e) => setNewPartPrice(e.target.value)} className="h-8 text-sm text-right w-24 ml-auto" />
+                  </td>
+                  <td className="px-6 py-2 text-right font-medium text-gray-500">
+                    {formatCurrency((parseFloat(newPartQty) || 0) * (parseFloat(newPartPrice) || 0))}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <div className="flex items-center justify-end gap-0.5">
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={saveNewPart} disabled={savingLine}>
+                        <Check className="w-3.5 h-3.5 text-green-600" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setAddingPart(false)}>
+                        <X className="w-3.5 h-3.5 text-gray-400" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+            <tfoot>
+              <tr className="bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+                <td colSpan={isEditable ? 4 : 3} className="px-6 py-3 text-right font-medium text-gray-700 dark:text-gray-300">Parts Total</td>
+                <td className="px-6 py-3 text-right font-bold text-gray-900 dark:text-gray-100">
+                  {formatCurrency(partLines.reduce((s, l) => s + Number(l.hours) * Number(l.rate), 0))}
+                </td>
+              </tr>
+              <tr className="bg-gray-100 dark:bg-gray-800 border-t-2 border-gray-300 dark:border-gray-600">
+                <td colSpan={isEditable ? 4 : 3} className="px-6 py-3 text-right font-semibold text-gray-800 dark:text-gray-200">Grand Total</td>
+                <td className="px-6 py-3 text-right font-bold text-gray-900 dark:text-gray-100">
                   {formatCurrency(invoice.total || 0)}
                 </td>
               </tr>

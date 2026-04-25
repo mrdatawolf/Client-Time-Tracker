@@ -61,7 +61,11 @@ app.get('/:id/pdf', async (c) => {
   const lines = await db.select().from(invoiceLineItems)
     .where(eq(invoiceLineItems.invoiceId, id));
 
-  const total = lines.reduce((sum, l) => sum + Number(l.hours) * Number(l.rate), 0);
+  const laborLines = lines.filter(l => l.lineItemType !== 'part');
+  const partLines = lines.filter(l => l.lineItemType === 'part');
+  const laborTotal = laborLines.reduce((sum, l) => sum + Number(l.hours) * Number(l.rate), 0);
+  const partsSubtotal = partLines.reduce((sum, l) => sum + Number(l.hours) * Number(l.rate), 0);
+  const total = laborTotal + partsSubtotal;
 
   // Get company settings
   const settingsRows = await db.select().from(appSettings);
@@ -135,11 +139,9 @@ app.get('/:id/pdf', async (c) => {
   let rowY = tableTop + 22;
   doc.font('Helvetica').fontSize(10);
 
-  for (const line of lines) {
+  function renderPdfRow(line: typeof lines[number]) {
     const lineTotal = Number(line.hours) * Number(line.rate);
     const desc = line.description || '';
-
-    // Wrap long descriptions
     const descHeight = doc.heightOfString(desc, { width: 270 });
     const rowHeight = Math.max(descHeight, 16);
 
@@ -152,8 +154,35 @@ app.get('/:id/pdf', async (c) => {
     doc.text(Number(line.hours).toFixed(2), colHrs, rowY, { width: 70 });
     doc.text(`$${Number(line.rate).toFixed(2)}`, colRate, rowY, { width: 70 });
     doc.text(`$${lineTotal.toFixed(2)}`, colTotal, rowY, { width: 70, align: 'right' });
-
     rowY += rowHeight + 6;
+  }
+
+  // Labor rows
+  for (const line of laborLines) renderPdfRow(line);
+
+  // Parts & Expenses section (only if present)
+  if (partLines.length > 0) {
+    rowY += 10;
+    doc.moveTo(50, rowY).lineTo(562, rowY).lineWidth(0.5).stroke();
+    rowY += 8;
+    doc.fontSize(9).font('Helvetica-Bold')
+      .text('PARTS & EXPENSES', colDesc, rowY)
+      .text('QTY', colHrs, rowY)
+      .text('UNIT PRICE', colRate, rowY)
+      .text('SUB TOTAL', colTotal, rowY);
+    doc.moveTo(50, rowY + 12).lineTo(562, rowY + 12).lineWidth(0.5).stroke();
+    rowY += 20;
+    doc.font('Helvetica').fontSize(10);
+
+    for (const line of partLines) renderPdfRow(line);
+
+    // Parts subtotal line
+    rowY += 4;
+    doc.fontSize(10).font('Helvetica')
+      .text('Parts & Expenses Subtotal', colDesc, rowY, { width: 430 });
+    doc.fontSize(10).font('Helvetica-Bold')
+      .text(`$${partsSubtotal.toFixed(2)}`, colTotal, rowY, { width: 70, align: 'right' });
+    rowY += 18;
   }
 
   // Notes
@@ -357,6 +386,7 @@ app.post('/:invoiceId/line-items', requireAdmin(), async (c) => {
     hours: body.hours,
     rate: body.rate,
     timeEntryId: body.timeEntryId || null,
+    lineItemType: body.lineItemType || 'labor',
   }).returning();
 
   return c.json(line, 201);
@@ -413,11 +443,12 @@ app.get('/:id/split', requireAdmin(), async (c) => {
   const techSplit = settings.splitTechPercent || 0.73;
   const holderSplit = settings.splitHolderPercent || 0.27;
 
-  // Get line items with their linked time entries to find techs
+  // Get line items with their linked time entries to find techs (parts excluded from split)
   const lineItemsWithTechs = await localClient.query(`
     SELECT
       li.hours,
       li.rate,
+      li.line_item_type,
       te.tech_id,
       u.display_name as tech_name
     FROM invoice_line_items li
@@ -444,11 +475,14 @@ app.get('/:id/split', requireAdmin(), async (c) => {
   }>();
 
   for (const row of lineItemsWithTechs.rows) {
+    // Parts/expenses are pass-through costs — excluded from partner split
+    if (row.line_item_type === 'part') continue;
+
     const revenue = parseFloat(row.hours) * parseFloat(row.rate);
     const techId = row.tech_id;
 
     if (!techId) {
-      // Manual line item with no linked time entry - attribute to holder if exists
+      // Manual labor line item with no linked time entry - attribute to holder if exists
       if (client.accountHolderId && holderName) {
         if (!partnerEarnings.has(client.accountHolderId)) {
           partnerEarnings.set(client.accountHolderId, {
@@ -511,9 +545,15 @@ app.get('/:id/split', requireAdmin(), async (c) => {
     isPaidOut: flagMap.get(p.partnerId) || false,
   }));
 
+  // Compute parts total (excluded from split)
+  const partsTotal = lineItemsWithTechs.rows
+    .filter((r: any) => r.line_item_type === 'part')
+    .reduce((sum: number, r: any) => sum + parseFloat(r.hours) * parseFloat(r.rate), 0);
+
   return c.json({
     splits,
     splitConfig: { techPercent: techSplit * 100, holderPercent: holderSplit * 100 },
+    partsTotal: partsTotal.toFixed(2),
   });
 });
 

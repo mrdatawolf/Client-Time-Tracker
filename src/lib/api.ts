@@ -263,6 +263,7 @@ export interface InvoiceLineItem {
   description: string;
   hours: string;
   rate: string;
+  lineItemType: 'labor' | 'part';
   createdAt: string;
 }
 
@@ -290,6 +291,7 @@ export interface InvoiceSplitResponse {
     techPercent: number;
     holderPercent: number;
   };
+  partsTotal: string;
 }
 
 export interface GenerateInvoiceRequest {
@@ -338,7 +340,7 @@ export const invoices = {
       body: JSON.stringify(data),
     }),
 
-  addLineItem: (invoiceId: string, data: { description: string; hours: string; rate: string }) =>
+  addLineItem: (invoiceId: string, data: { description: string; hours: string; rate: string; lineItemType?: 'labor' | 'part' }) =>
     apiClient<InvoiceLineItem>(`/api/invoices/${invoiceId}/line-items`, {
       method: 'POST',
       body: JSON.stringify(data),

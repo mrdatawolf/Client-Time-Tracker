@@ -378,10 +378,13 @@ export async function initializeSchema(client: PGlite): Promise<void> {
     -- Fix invoice_line_items foreign key to allow deleting time entries
     DO $$ BEGIN
       ALTER TABLE invoice_line_items DROP CONSTRAINT IF EXISTS invoice_line_items_time_entry_id_fkey;
-      ALTER TABLE invoice_line_items ADD CONSTRAINT invoice_line_items_time_entry_id_fkey 
+      ALTER TABLE invoice_line_items ADD CONSTRAINT invoice_line_items_time_entry_id_fkey
         FOREIGN KEY (time_entry_id) REFERENCES time_entries(id) ON DELETE SET NULL;
     EXCEPTION WHEN others THEN NULL;
     END $$;
+
+    -- Parts/expenses support: distinguish labor line items from parts
+    ALTER TABLE invoice_line_items ADD COLUMN IF NOT EXISTS line_item_type TEXT NOT NULL DEFAULT 'labor';
   `);
 
   // 4. Triggers and Functions

@@ -122,6 +122,7 @@ export const invoiceLineItems = pgTable('invoice_line_items', {
   description: text('description').notNull(),
   hours: numeric('hours', { precision: 6, scale: 2 }).notNull(),
   rate: numeric('rate', { precision: 10, scale: 2 }).notNull(),
+  lineItemType: text('line_item_type').notNull().default('labor'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 

@@ -46,7 +46,7 @@ function getTableColumns(tableName: string): string[] {
     client_chat_logs: ['id', 'client_id', 'content', 'updated_at'],
     invoices: ['id', 'client_id', 'invoice_number', 'date_issued', 'date_due', 'status', 'notes', 'is_auto_generated', 'created_at', 'updated_at'],
     time_entries: ['id', 'client_id', 'tech_id', 'job_type_id', 'rate_tier_id', 'date', 'hours', 'notes', 'group_id', 'is_billed', 'is_paid', 'invoice_id', 'created_at', 'updated_at'],
-    invoice_line_items: ['id', 'invoice_id', 'time_entry_id', 'description', 'hours', 'rate', 'created_at'],
+    invoice_line_items: ['id', 'invoice_id', 'time_entry_id', 'description', 'hours', 'rate', 'line_item_type', 'created_at'],
     payments: ['id', 'invoice_id', 'amount', 'date_paid', 'method', 'notes', 'created_at'],
     partner_splits: ['id', 'partner_id', 'split_percent', 'effective_from', 'effective_to', 'created_at'],
     partner_payments: ['id', 'from_partner_id', 'to_partner_id', 'amount', 'date_paid', 'notes', 'created_at'],
