@@ -21,6 +21,7 @@ import {
   type BalanceEntry,
   type Client,
   type PartnerSettlementReport,
+  type PartnerBreakdownReport,
   type AgedReceivablesReport,
   type WipReport,
   type EffectiveRateReport,
@@ -32,7 +33,7 @@ import {
 import { formatCurrency, formatDate, toISODate } from '@/lib/utils';
 import { isAdmin } from '@/lib/api-client';
 
-type Tab = 'client' | 'tech' | 'entries' | 'balance' | 'settlement' | 'aged' | 'wip' | 'profitability' | 'utilization' | 'tax';
+type Tab = 'client' | 'tech' | 'entries' | 'balance' | 'settlement' | 'partners' | 'aged' | 'wip' | 'profitability' | 'utilization' | 'tax';
 
 export default function ReportsPage() {
   const admin = isAdmin();
@@ -44,6 +45,10 @@ export default function ReportsPage() {
   const [clientSummary, setClientSummary] = useState<ClientSummary[]>([]);
   const [techSummary, setTechSummary] = useState<TechSummary[]>([]);
   const [settlementData, setSettlementData] = useState<PartnerSettlementReport[]>([]);
+  const [partnerBreakdownData, setPartnerBreakdownData] = useState<PartnerBreakdownReport[]>([]);
+  const [partnerDateFrom, setPartnerDateFrom] = useState('');
+  const [partnerDateTo, setPartnerDateTo] = useState('');
+  const [partnerClientFilter, setPartnerClientFilter] = useState('');
   const [agedData, setAgedData] = useState<AgedReceivablesReport | null>(null);
   const [wipData, setWipData] = useState<WipReport | null>(null);
   const [profitabilityData, setProfitabilityData] = useState<EffectiveRateReport[]>([]);
@@ -84,6 +89,10 @@ export default function ReportsPage() {
     const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     setDateFrom(toISODate(firstOfMonth));
     setDateTo(toISODate(now));
+    // Partner breakdown defaults to year-to-date
+    const jan1 = new Date(now.getFullYear(), 0, 1);
+    setPartnerDateFrom(toISODate(jan1));
+    setPartnerDateTo(toISODate(now));
     clientsApi.list().then((clients) => {
       setClientList(clients);
       // Default balance client to first active client
@@ -94,8 +103,28 @@ export default function ReportsPage() {
     }).catch(console.error);
   }, []);
 
+  const loadPartnerBreakdown = useCallback(async () => {
+    if (!partnerDateFrom || !partnerDateTo) return;
+    setLoading(true);
+    try {
+      setPartnerBreakdownData(await reportsApi.partnerBreakdown({
+        dateFrom: partnerDateFrom,
+        dateTo: partnerDateTo,
+        clientId: partnerClientFilter || undefined,
+      }));
+    } catch (err) {
+      console.error('Failed to load partner breakdown:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [partnerDateFrom, partnerDateTo, partnerClientFilter]);
+
+  useEffect(() => {
+    if (tab === 'partners') loadPartnerBreakdown();
+  }, [tab, loadPartnerBreakdown]);
+
   const loadData = useCallback(async () => {
-    if (tab === 'balance' || tab === 'tax') return; // these tabs have their own loaders
+    if (tab === 'balance' || tab === 'tax' || tab === 'partners') return;
     if (!dateFrom || !dateTo) return;
     setLoading(true);
     try {
@@ -260,6 +289,7 @@ export default function ReportsPage() {
     { key: 'client', label: 'By Client', icon: Briefcase, adminOnly: true },
     { key: 'tech', label: 'By Tech', icon: Users, adminOnly: true },
     { key: 'settlement', label: 'Settlement', icon: DollarSign, adminOnly: true },
+    { key: 'partners', label: 'Partners', icon: Users, adminOnly: true },
     { key: 'aged', label: 'Aged A/R', icon: Clock, adminOnly: true },
     { key: 'wip', label: 'WIP', icon: Timer, adminOnly: true },
     { key: 'profitability', label: 'Profitability', icon: TrendingUp, adminOnly: true },
@@ -281,7 +311,7 @@ export default function ReportsPage() {
           </h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">Time and revenue analytics</p>
         </div>
-        {tab !== 'balance' && tab !== 'tax' && (
+        {tab !== 'balance' && tab !== 'tax' && tab !== 'partners' && (
           <Button variant="outline" onClick={handleExport}>
             <Download className="w-4 h-4 mr-2" />
             Export CSV
@@ -301,6 +331,30 @@ export default function ReportsPage() {
             >
               {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => (
                 <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      ) : tab === 'partners' ? (
+        <div className="flex flex-wrap items-end gap-3 mb-6">
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-gray-500 dark:text-gray-400">From</label>
+            <Input type="date" value={partnerDateFrom} onChange={(e) => setPartnerDateFrom(e.target.value)} className="w-40" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-gray-500 dark:text-gray-400">To</label>
+            <Input type="date" value={partnerDateTo} onChange={(e) => setPartnerDateTo(e.target.value)} className="w-40" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Client</label>
+            <select
+              value={partnerClientFilter}
+              onChange={(e) => setPartnerClientFilter(e.target.value)}
+              className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 h-9"
+            >
+              <option value="">All Clients</option>
+              {clientList.filter(c => c.isActive).map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
           </div>
@@ -390,7 +444,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Content */}
-      {loading && tab !== 'balance' && tab !== 'tax' ? (
+      {loading && tab !== 'balance' && tab !== 'tax' && tab !== 'partners' ? (
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-8 text-center text-gray-500 dark:text-gray-400">
           Loading...
         </div>
@@ -543,6 +597,105 @@ export default function ReportsPage() {
             </table>
           )}
         </div>
+      ) : tab === 'partners' ? (
+        loading ? (
+          <div className="p-8 text-center text-gray-500 dark:text-gray-400">Loading...</div>
+        ) : partnerBreakdownData.length === 0 ? (
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-8 text-center text-gray-500 dark:text-gray-400">
+            No partner data for this period
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {partnerBreakdownData.map((partner) => {
+              const balance = parseFloat(partner.balance);
+              return (
+                <div key={partner.id} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+                  {/* Partner header */}
+                  <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{partner.name}</h3>
+                    <div className="flex items-center gap-6 text-sm">
+                      <span className="text-gray-500 dark:text-gray-400">
+                        {(parseFloat(partner.paidHours) + parseFloat(partner.unpaidHours)).toFixed(2)}h total
+                      </span>
+                      <span className={`font-bold text-base ${balance > 0 ? 'text-green-600' : balance < 0 ? 'text-red-500' : 'text-gray-400'}`}>
+                        Balance owed: {formatCurrency(balance)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Two cards: Paid / Billed-Unpaid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-gray-100 dark:divide-gray-700">
+                    {/* Paid card */}
+                    <div className="p-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+                        <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Paid Revenue</span>
+                        <span className="ml-1 text-xs text-gray-400 dark:text-gray-500">(client has paid us)</span>
+                      </div>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-500 dark:text-gray-400">As Tech</span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">{formatCurrency(partner.paidEarnedAsTech)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500 dark:text-gray-400">As Account Holder</span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">{formatCurrency(partner.paidEarnedAsHolder)}</span>
+                        </div>
+                        <div className="flex justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
+                          <span className="font-medium text-gray-700 dark:text-gray-300">Total Earned</span>
+                          <span className="font-bold text-green-600">{formatCurrency(partner.paidTotal)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500">
+                          <span>{parseFloat(partner.paidHours).toFixed(2)}h billed &amp; paid</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Billed-unpaid card */}
+                    <div className="p-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
+                        <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Billed (Awaiting Payment)</span>
+                        <span className="ml-1 text-xs text-gray-400 dark:text-gray-500">(invoiced, not yet paid)</span>
+                      </div>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-500 dark:text-gray-400">As Tech</span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">{formatCurrency(partner.unpaidEarnedAsTech)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500 dark:text-gray-400">As Account Holder</span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">{formatCurrency(partner.unpaidEarnedAsHolder)}</span>
+                        </div>
+                        <div className="flex justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
+                          <span className="font-medium text-gray-700 dark:text-gray-300">Total Outstanding</span>
+                          <span className="font-bold text-amber-600">{formatCurrency(partner.unpaidTotal)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500">
+                          <span>{parseFloat(partner.unpaidHours).toFixed(2)}h billed, awaiting client payment</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Payout summary footer */}
+                  <div className="px-6 py-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-100 dark:border-gray-700 flex flex-wrap gap-6 text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-500 dark:text-gray-400">Paid out to partner:</span>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">{formatCurrency(partner.totalPaidOut)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-500 dark:text-gray-400">Still owed (from paid revenue):</span>
+                      <span className={`font-bold ${balance > 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                        {formatCurrency(balance)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )
       ) : tab === 'aged' ? (
         <div className="space-y-6">
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">

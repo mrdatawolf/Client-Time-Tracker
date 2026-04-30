@@ -62,9 +62,11 @@ export default function InvoicesPage() {
     if (!confirm('Delete this invoice? This will unmark all linked time entries as billed.')) return;
     try {
       await invoicesApi.delete(id);
+      toast.success('Invoice deleted');
       loadInvoices();
     } catch (err) {
       console.error('Failed to delete invoice:', err);
+      toast.error('Failed to delete invoice: ' + (err instanceof Error ? err.message : String(err)));
     }
   }
 
