@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { getDb } from '@ctt/shared/db';
-import { invoices, invoiceLineItems, timeEntries, rateTiers, clients, appSettings, users, autoInvoiceLog, invoicePayoutFlags } from '@ctt/shared/schema';
+import { invoices, invoiceLineItems, timeEntries, rateTiers, clients, appSettings, users, autoInvoiceLog, invoicePayoutFlags, payments } from '@ctt/shared/schema';
 import { requireAdmin } from '../middleware/auth';
 import type { AppEnv } from '../types';
 import PDFDocument from 'pdfkit';
@@ -336,6 +336,17 @@ app.delete('/:id', requireAdmin(), async (c) => {
 
   // Delete line items
   await db.delete(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, id));
+
+  // Delete payments recorded against this invoice
+  await db.delete(payments).where(eq(payments.invoiceId, id));
+
+  // Delete partner payout flags
+  await db.delete(invoicePayoutFlags).where(eq(invoicePayoutFlags.invoiceId, id));
+
+  // Null out auto-invoice log references (keep the log entry for history)
+  await db.update(autoInvoiceLog)
+    .set({ invoiceId: null })
+    .where(eq(autoInvoiceLog.invoiceId, id));
 
   // Delete invoice
   const [deleted] = await db.delete(invoices).where(eq(invoices.id, id)).returning();

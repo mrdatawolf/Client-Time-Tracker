@@ -1095,4 +1095,126 @@ app.get('/tax-export', requireAdmin(), async (c) => {
   });
 });
 
+// Partner Breakdown Report: per-partner view split into paid vs. billed-unpaid revenue
+app.get('/partner-breakdown', requireAdmin(), async (c) => {
+  const db = await getDb();
+  const dateFrom = c.req.query('dateFrom');
+  const dateTo = c.req.query('dateTo');
+  const clientId = c.req.query('clientId');
+
+  const localClient = (db as any)._.session.client;
+
+  // Split settings
+  const settingsRes = await localClient.query(`
+    SELECT key, value FROM app_settings
+    WHERE key IN ('splitTechPercent', 'splitHolderPercent')
+  `);
+  const settings: Record<string, number> = {};
+  settingsRes.rows.forEach((r: any) => { settings[r.key] = parseFloat(r.value) / 100; });
+  const techSplit = settings.splitTechPercent || 0.73;
+  const holderSplit = settings.splitHolderPercent || 0.27;
+
+  // Build dynamic conditions
+  const params: any[] = [];
+  const conditions: string[] = [];
+  if (dateFrom) { params.push(dateFrom); conditions.push(`te.date >= $${params.length}`); }
+  if (dateTo)   { params.push(dateTo);   conditions.push(`te.date <= $${params.length}`); }
+  if (clientId) { params.push(clientId); conditions.push(`te.client_id = $${params.length}`); }
+  const whereClause = conditions.length > 0 ? `AND ${conditions.join(' AND ')}` : '';
+
+  // All billed or paid entries with their split context
+  const entriesRes = await localClient.query(`
+    SELECT
+      te.tech_id,
+      c.account_holder_id,
+      (CAST(te.hours AS NUMERIC) * CAST(rt.amount AS NUMERIC)) AS revenue,
+      CAST(te.hours AS NUMERIC) AS hours,
+      te.is_paid,
+      te.is_billed
+    FROM time_entries te
+    JOIN clients c ON te.client_id = c.id
+    JOIN rate_tiers rt ON te.rate_tier_id = rt.id
+    WHERE (te.is_billed = true OR te.is_paid = true)
+    ${whereClause}
+  `, params);
+
+  // All active partners
+  const partnersRes = await localClient.query(`
+    SELECT id, display_name FROM users
+    WHERE role IN ('admin', 'partner') AND is_active = true
+    ORDER BY display_name
+  `);
+
+  // Partner payouts already made (all time, not filtered by date — these are balance items)
+  const payoutsRes = await localClient.query(`
+    SELECT to_partner_id, SUM(CAST(amount AS NUMERIC)) AS total
+    FROM partner_payments
+    GROUP BY to_partner_id
+  `);
+  const payoutMap = new Map<string, number>();
+  payoutsRes.rows.forEach((r: any) => payoutMap.set(r.to_partner_id, parseFloat(r.total)));
+
+  // Initialise per-partner accumulators
+  type Acc = {
+    id: string; name: string;
+    paidEarnedAsTech: number; paidEarnedAsHolder: number;
+    unpaidEarnedAsTech: number; unpaidEarnedAsHolder: number;
+    paidHours: number; unpaidHours: number;
+  };
+  const report = new Map<string, Acc>();
+  partnersRes.rows.forEach((p: any) => {
+    report.set(p.id, {
+      id: p.id, name: p.display_name,
+      paidEarnedAsTech: 0, paidEarnedAsHolder: 0,
+      unpaidEarnedAsTech: 0, unpaidEarnedAsHolder: 0,
+      paidHours: 0, unpaidHours: 0,
+    });
+  });
+
+  for (const row of entriesRes.rows) {
+    const revenue = parseFloat(row.revenue);
+    const hours = parseFloat(row.hours);
+    const isPaid = row.is_paid;
+    const isSoleOwner = row.tech_id === row.account_holder_id;
+
+    // Tech share
+    if (report.has(row.tech_id)) {
+      const p = report.get(row.tech_id)!;
+      const share = isSoleOwner ? revenue : revenue * techSplit;
+      if (isPaid) { p.paidEarnedAsTech += share; p.paidHours += hours; }
+      else        { p.unpaidEarnedAsTech += share; p.unpaidHours += hours; }
+    }
+
+    // Holder share (only when different from tech)
+    if (row.account_holder_id && !isSoleOwner && report.has(row.account_holder_id)) {
+      const p = report.get(row.account_holder_id)!;
+      const share = revenue * holderSplit;
+      if (isPaid) { p.paidEarnedAsHolder += share; }
+      else        { p.unpaidEarnedAsHolder += share; }
+    }
+  }
+
+  const result = Array.from(report.values()).map(p => {
+    const paidTotal   = p.paidEarnedAsTech + p.paidEarnedAsHolder;
+    const unpaidTotal = p.unpaidEarnedAsTech + p.unpaidEarnedAsHolder;
+    const totalPaidOut = payoutMap.get(p.id) || 0;
+    return {
+      id: p.id,
+      name: p.name,
+      paidEarnedAsTech:    p.paidEarnedAsTech.toFixed(2),
+      paidEarnedAsHolder:  p.paidEarnedAsHolder.toFixed(2),
+      paidTotal:           paidTotal.toFixed(2),
+      unpaidEarnedAsTech:  p.unpaidEarnedAsTech.toFixed(2),
+      unpaidEarnedAsHolder:p.unpaidEarnedAsHolder.toFixed(2),
+      unpaidTotal:         unpaidTotal.toFixed(2),
+      paidHours:           p.paidHours.toFixed(2),
+      unpaidHours:         p.unpaidHours.toFixed(2),
+      totalPaidOut:        totalPaidOut.toFixed(2),
+      balance:             (paidTotal - totalPaidOut).toFixed(2),
+    };
+  });
+
+  return c.json(result);
+});
+
 export default app;

@@ -24,6 +24,7 @@ import {
 } from '@/lib/api';
 import { formatCurrency, formatDate, toISODate } from '@/lib/utils';
 import Link from 'next/link';
+import { toast } from 'sonner';
 
 const STATUS_STYLES: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-700',
@@ -238,6 +239,7 @@ export default function InvoiceDetailPage() {
       router.push('/invoices');
     } catch (err) {
       console.error('Failed to delete invoice:', err);
+      toast.error('Failed to delete invoice: ' + (err instanceof Error ? err.message : String(err)));
     }
   }
 
@@ -318,6 +320,7 @@ export default function InvoiceDetailPage() {
 
   const totalPaid = paymentList.reduce((sum, p) => sum + Number(p.amount), 0);
   const remaining = (invoice.total || 0) - totalPaid;
+  const amountStillOwed = splitData.filter(s => !s.isPaidOut).reduce((sum, s) => sum + Number(s.amount), 0);
   const transitions = STATUS_TRANSITIONS[invoice.status] || [];
   const isEditable = invoice.status === 'draft' || invoice.status === 'sent';
 
@@ -445,15 +448,15 @@ export default function InvoiceDetailPage() {
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
           <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-            {invoice.status === 'paid' ? 'Paid — Split' : invoice.status === 'sent' ? 'Early Payouts' : 'Paid'}
+            {invoice.status === 'paid' ? 'Paid — Split' : invoice.status === 'sent' ? 'Amount Still Owed to People' : 'Paid'}
           </div>
           <div className="text-xl font-bold text-green-600">
-            {formatCurrency(totalPaid)}
+            {formatCurrency(invoice.status === 'sent' ? amountStillOwed : totalPaid)}
           </div>
           {(invoice.status === 'paid' || invoice.status === 'sent') && splitData.length > 0 && (
             <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700 space-y-1.5">
               {invoice.status === 'sent' && (
-                <p className="text-xs text-gray-400 dark:text-gray-500 mb-1.5">Check off partners paid before client pays.</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mb-1.5">Check off when paid to remove from total.</p>
               )}
               {splitData.map((s) => (
                 <label
@@ -483,14 +486,35 @@ export default function InvoiceDetailPage() {
           </div>
           {invoice.status !== 'paid' && invoice.status !== 'void' && splitData.length > 0 ? (
             <div className="space-y-1.5">
+              {invoice.status === 'draft' && (
+                <p className="text-xs text-gray-400 dark:text-gray-500 mb-1.5">Check off partners you've already paid early.</p>
+              )}
               {splitData.map((s) => (
-                <div key={s.partnerId} className="flex items-center justify-between text-sm">
-                  <div>
-                    <span className="text-gray-700 dark:text-gray-300">{s.partnerName}</span>
-                    <span className="text-gray-400 dark:text-gray-500 text-xs ml-1">({s.role})</span>
+                invoice.status === 'draft' ? (
+                  <label key={s.partnerId} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={s.isPaidOut}
+                      onChange={() => handleTogglePayout(s.partnerId)}
+                      className="rounded border-gray-300 dark:border-gray-600 text-green-600 focus:ring-green-500"
+                    />
+                    <span className={`flex-1 ${s.isPaidOut ? 'text-green-600 line-through' : 'text-gray-700 dark:text-gray-300'}`}>
+                      {s.partnerName}
+                      <span className="text-gray-400 dark:text-gray-500 text-xs ml-1">({s.role})</span>
+                    </span>
+                    <span className={`font-medium ${s.isPaidOut ? 'text-green-600' : 'text-amber-600'}`}>
+                      {formatCurrency(s.amount)}
+                    </span>
+                  </label>
+                ) : (
+                  <div key={s.partnerId} className="flex items-center justify-between text-sm">
+                    <div>
+                      <span className="text-gray-700 dark:text-gray-300">{s.partnerName}</span>
+                      <span className="text-gray-400 dark:text-gray-500 text-xs ml-1">({s.role})</span>
+                    </div>
+                    <span className="font-medium text-amber-600">{formatCurrency(s.amount)}</span>
                   </div>
-                  <span className="font-medium text-amber-600">{formatCurrency(s.amount)}</span>
-                </div>
+                )
               ))}
               {partsTotal > 0 && (
                 <div className="flex items-center justify-between text-sm pt-1 border-t border-gray-100 dark:border-gray-700">

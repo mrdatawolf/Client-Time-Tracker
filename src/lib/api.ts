@@ -507,6 +507,24 @@ export interface PartnerSettlementReport {
   balance: string;
 }
 
+export interface PartnerBreakdownReport {
+  id: string;
+  name: string;
+  // Revenue from paid invoices (client has paid us)
+  paidEarnedAsTech: string;
+  paidEarnedAsHolder: string;
+  paidTotal: string;
+  paidHours: string;
+  // Revenue from billed-but-unpaid invoices (outstanding from client)
+  unpaidEarnedAsTech: string;
+  unpaidEarnedAsHolder: string;
+  unpaidTotal: string;
+  unpaidHours: string;
+  // Partner payout state
+  totalPaidOut: string;
+  balance: string;
+}
+
   export interface AgedReceivablesReport {
     invoices: Array<{
       id: string;
@@ -659,6 +677,15 @@ export interface PartnerSettlementReport {
       if (filters?.dateTo) params.set('dateTo', filters.dateTo);
       const qs = params.toString();
       return apiClient<PartnerSettlementReport[]>(`/api/reports/partner-settlement${qs ? `?${qs}` : ''}`);
+    },
+
+    partnerBreakdown: (filters?: { dateFrom?: string; dateTo?: string; clientId?: string }) => {
+      const params = new URLSearchParams();
+      if (filters?.dateFrom) params.set('dateFrom', filters.dateFrom);
+      if (filters?.dateTo)   params.set('dateTo',   filters.dateTo);
+      if (filters?.clientId) params.set('clientId', filters.clientId);
+      const qs = params.toString();
+      return apiClient<PartnerBreakdownReport[]>(`/api/reports/partner-breakdown${qs ? `?${qs}` : ''}`);
     },
   
     agedReceivables: () => {
