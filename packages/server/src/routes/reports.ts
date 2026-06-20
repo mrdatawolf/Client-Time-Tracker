@@ -442,7 +442,8 @@ app.get('/partner-settlement', requireAdmin(), async (c) => {
     // Tech Earning
     if (report.has(row.tech_id)) {
       const p = report.get(row.tech_id)!;
-      const share = row.tech_id === row.account_holder_id ? revenue : revenue * techSplit;
+      const isSoleOwner = !row.account_holder_id || row.tech_id === row.account_holder_id;
+      const share = isSoleOwner ? revenue : revenue * techSplit;
       p.earnedAsTech += share;
       p.totalEarned += share;
     }
@@ -899,7 +900,8 @@ app.get('/partner-earnings', requireAdmin(), async (c) => {
 
     if (report.has(row.tech_id)) {
       const p = report.get(row.tech_id)!;
-      const share = row.tech_id === row.account_holder_id ? revenue : revenue * techSplit;
+      const isSoleOwner = !row.account_holder_id || row.tech_id === row.account_holder_id;
+      const share = isSoleOwner ? revenue : revenue * techSplit;
       p.earnedAsTech += share;
       p.totalEarned += share;
     }
@@ -1175,7 +1177,7 @@ app.get('/partner-breakdown', requireAdmin(), async (c) => {
     const revenue = parseFloat(row.revenue);
     const hours = parseFloat(row.hours);
     const isPaid = row.is_paid;
-    const isSoleOwner = row.tech_id === row.account_holder_id;
+    const isSoleOwner = !row.account_holder_id || row.tech_id === row.account_holder_id;
 
     // Tech share
     if (report.has(row.tech_id)) {

@@ -689,10 +689,11 @@ export default function InvoiceDetailPage() {
             </tbody>
             <tfoot>
               <tr className="bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
-                <td colSpan={isEditable ? 4 : 3} className="px-6 py-3 text-right font-medium text-gray-700 dark:text-gray-300">Labor Total</td>
+                <td colSpan={3} className="px-6 py-3 text-right font-medium text-gray-700 dark:text-gray-300">Labor Total</td>
                 <td className="px-6 py-3 text-right font-bold text-gray-900 dark:text-gray-100">
                   {formatCurrency(laborLines.reduce((s, l) => s + Number(l.hours) * Number(l.rate), 0))}
                 </td>
+                {isEditable && <td />}
               </tr>
             </tfoot>
           </table>
@@ -815,16 +816,18 @@ export default function InvoiceDetailPage() {
             </tbody>
             <tfoot>
               <tr className="bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
-                <td colSpan={isEditable ? 4 : 3} className="px-6 py-3 text-right font-medium text-gray-700 dark:text-gray-300">Parts Total</td>
+                <td colSpan={3} className="px-6 py-3 text-right font-medium text-gray-700 dark:text-gray-300">Parts Total</td>
                 <td className="px-6 py-3 text-right font-bold text-gray-900 dark:text-gray-100">
                   {formatCurrency(partLines.reduce((s, l) => s + Number(l.hours) * Number(l.rate), 0))}
                 </td>
+                {isEditable && <td />}
               </tr>
               <tr className="bg-gray-100 dark:bg-gray-800 border-t-2 border-gray-300 dark:border-gray-600">
-                <td colSpan={isEditable ? 4 : 3} className="px-6 py-3 text-right font-semibold text-gray-800 dark:text-gray-200">Grand Total</td>
+                <td colSpan={3} className="px-6 py-3 text-right font-semibold text-gray-800 dark:text-gray-200">Grand Total</td>
                 <td className="px-6 py-3 text-right font-bold text-gray-900 dark:text-gray-100">
                   {formatCurrency(invoice.total || 0)}
                 </td>
+                {isEditable && <td />}
               </tr>
             </tfoot>
           </table>
