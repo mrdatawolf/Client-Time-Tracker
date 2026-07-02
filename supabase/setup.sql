@@ -427,6 +427,8 @@ begin
       raise exception 'Only partners can manage partner users';
     end if;
 
+    -- reassign any audit history before removing the stub (same human)
+    update public.audit_log set user_id = p_link_to where user_id = p_user_id;
     delete from public.users where id = p_user_id;
 
     update public.users

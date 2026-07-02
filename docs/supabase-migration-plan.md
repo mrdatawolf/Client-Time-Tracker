@@ -81,10 +81,13 @@ production data.
      `users.status text` (`pending`/`active`/`disabled`). Keep existing `users.id` UUIDs — all FK history
      (`time_entries.tech_id`, etc.) is preserved.
    - `schema_meta(version int, applied_at)` for the in-app version check.
-2. **Signup trigger** — `AFTER INSERT ON auth.users` creates a `pending` row in `users`.
-   Admin approval UI later sets role + status, or **links the new auth account to an existing user row**
-   (this is also how current staff migrate: they sign up with email, admin links them to their historical
-   tech record — no password import, no service-key tooling).
+2. **Signup trigger** — `AFTER INSERT ON auth.users`: if a `users` row already has that email (and no
+   auth link), the account **auto-links** to it and activates; else if nobody can log in yet, the first
+   signup becomes an active partner (bootstrap); else a `pending` row is created for admin approval.
+   The approval UI can also **link a pending account to an existing user row** manually. Either way,
+   staff keep their historical tech record — no password import, no service-key tooling.
+   Known emails to pre-fill before cutover: `patrick` → patrickmoon@gmail.com,
+   `anthony` → atech8700@gmail.com (collect the rest before Phase 5).
 3. **RLS policies** — per the model above, on every table. Deny by default.
 4. **RPC functions** (port from server routes; most report queries in `routes/reports.ts` are already raw
    SQL and port nearly verbatim):
@@ -162,7 +165,9 @@ Runs only after the team agrees the new app is stable against test-project seeds
    `pg_dump` the old sync target → restore into the fresh project → run `setup.sql` +
    `cleanup-legacy-sync.sql` on it.
 3. Verify: row counts per table, spot-check invoices/balances/reports against the old app's numbers.
-4. Staff sign up with email; admin links each to their existing tech record; verify roles.
+4. Pre-fill each staff member's email on their `users` row (partners: patrickmoon@gmail.com,
+   atech8700@gmail.com), so signing up auto-links them to their history. Anyone without a
+   pre-filled email lands pending and gets linked via the admin approval UI. Verify roles.
 5. Hand out the new config string; team switches to the browser URL. Keep the frozen desktop/server
    install and the old sync-target project untouched for a comfort window (e.g. 30 days) as the
    rollback of record, then decommission both.
