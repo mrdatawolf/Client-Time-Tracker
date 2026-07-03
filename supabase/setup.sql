@@ -1815,6 +1815,34 @@ begin
 end
 $fn$;
 
+-- Outstanding balances per client for the client list (any active user,
+-- matching the legacy /api/clients list endpoint).
+create or replace function public.client_balances()
+returns jsonb
+language plpgsql stable security definer set search_path = public, pg_temp
+as $fn$
+declare v_out jsonb;
+begin
+  if current_setting('request.jwt.claims', true) is not null
+     and not public.is_active_user() then
+    raise exception 'Not authorized';
+  end if;
+  select coalesce(jsonb_agg(j), '[]'::jsonb) into v_out from (
+    select jsonb_build_object(
+      'clientId', te.client_id,
+      'unbilledTotal', to_char(coalesce(sum(case when not te.is_billed then te.hours * rt.amount end), 0), 'FM999999999990.00'),
+      'billedUnpaidTotal', to_char(coalesce(sum(case when te.is_billed and (i.status is null or i.status not in ('paid', 'void')) then te.hours * rt.amount end), 0), 'FM999999999990.00')
+    ) as j
+    from public.time_entries te
+    join public.rate_tiers rt on rt.id = te.rate_tier_id
+    left join public.invoices i on i.id = te.invoice_id
+    where te.is_paid = false
+    group by te.client_id
+  ) s;
+  return v_out;
+end
+$fn$;
+
 -- ----------------------------------------------------------------------------
 -- 11. Grants
 -- ----------------------------------------------------------------------------

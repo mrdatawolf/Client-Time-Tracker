@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, Plus, X, Sparkles, ChevronRight, ChevronLeft, Cloud, Monitor, Loader2, CheckCircle } from 'lucide-react';
+import { Check, Plus, X, Sparkles, ChevronRight, ChevronLeft } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -15,12 +15,11 @@ import {
   clients as clientsApi,
   jobTypes as jobTypesApi,
   settings as settingsApi,
-  supabaseSync,
 } from '@/lib/api';
 
 const COMMON_JOB_TYPES = ['Consulting', 'Hardware', 'Programming', 'Network'];
 
-type StepId = 'choose-path' | 'import-sync' | 'job-types' | 'client' | 'settings';
+type StepId = 'job-types' | 'client' | 'settings';
 
 interface StepDef {
   id: StepId;
@@ -36,8 +35,6 @@ interface OnboardingWizardProps {
   onComplete: () => void;
 }
 
-type ImportPhase = 'input' | 'importing' | 'testing' | 'schema' | 'syncing' | 'enabling' | 'done' | 'error';
-
 export default function OnboardingWizard({
   needsJobTypes,
   needsClient,
@@ -45,26 +42,13 @@ export default function OnboardingWizard({
   currentSettings,
   onComplete,
 }: OnboardingWizardProps) {
-  // Track whether user chose import or fresh setup
-  const [setupPath, setSetupPath] = useState<'fresh' | 'import' | null>(null);
-
-  // Build steps based on what's missing and chosen path
   const steps: StepDef[] = [];
-
-  if (needsClient && setupPath === null) {
-    // Show choice step first
-    steps.push({ id: 'choose-path', title: 'How would you like to set up?', description: 'Choose how to get started with Client Time Tracker' });
-  } else if (setupPath === 'import') {
-    steps.push({ id: 'import-sync', title: 'Import from Cloud', description: 'Paste the config code from an existing installation' });
-  } else {
-    // Fresh setup path (or no client needed)
-    if (needsJobTypes)
-      steps.push({ id: 'job-types', title: 'Job Types', description: 'Add the types of work you do' });
-    if (needsClient)
-      steps.push({ id: 'client', title: 'First Client', description: 'Add your first client to start tracking time' });
-    if (needsSettings)
-      steps.push({ id: 'settings', title: 'Business Settings', description: 'Set your default rate and company info' });
-  }
+  if (needsJobTypes)
+    steps.push({ id: 'job-types', title: 'Job Types', description: 'Add the types of work you do' });
+  if (needsClient)
+    steps.push({ id: 'client', title: 'First Client', description: 'Add your first client to start tracking time' });
+  if (needsSettings)
+    steps.push({ id: 'settings', title: 'Business Settings', description: 'Set your default rate and company info' });
 
   const [currentStep, setCurrentStep] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -84,12 +68,6 @@ export default function OnboardingWizard({
   const [baseRate, setBaseRate] = useState(currentSettings.baseHourlyRate || '');
   const [companyName, setCompanyName] = useState(currentSettings.companyName || '');
   const [payableTo, setPayableTo] = useState(currentSettings.invoicePayableTo || '');
-
-  // Import state
-  const [importCode, setImportCode] = useState('');
-  const [importPhase, setImportPhase] = useState<ImportPhase>('input');
-  const [importStatus, setImportStatus] = useState('');
-  const [importStats, setImportStats] = useState<{ pushed: number; pulled: number } | null>(null);
 
   const step = steps[currentStep];
   const isLastStep = currentStep === steps.length - 1;
@@ -122,10 +100,6 @@ export default function OnboardingWizard({
   const canProceed = (): boolean => {
     if (!step) return false;
     switch (step.id) {
-      case 'choose-path':
-        return false; // buttons handle navigation directly
-      case 'import-sync':
-        return false; // handled by import flow
       case 'job-types':
         return selectedPresets.length + customJobTypes.length > 0;
       case 'client':
@@ -190,16 +164,6 @@ export default function OnboardingWizard({
   };
 
   const handleBack = () => {
-    if (currentStep === 0 && setupPath !== null) {
-      // Go back to choose-path
-      setSetupPath(null);
-      setCurrentStep(0);
-      setError('');
-      setImportPhase('input');
-      setImportStatus('');
-      setImportCode('');
-      return;
-    }
     setCurrentStep((prev) => prev - 1);
     setError('');
   };
@@ -208,89 +172,6 @@ export default function OnboardingWizard({
     localStorage.setItem('ctt_onboarding_dismissed', 'true');
     onComplete();
   };
-
-  const handleChooseFresh = () => {
-    setSetupPath('fresh');
-    setCurrentStep(0);
-    setError('');
-  };
-
-  const handleChooseImport = () => {
-    setSetupPath('import');
-    setCurrentStep(0);
-    setError('');
-  };
-
-  const handleRunImport = async () => {
-    const code = importCode.trim();
-    if (!code) return;
-
-    setError('');
-
-    try {
-      // Step 1: Decrypt the config string
-      setImportPhase('importing');
-      setImportStatus('Decrypting configuration...');
-      const configFields = await supabaseSync.importConfig(code);
-
-      // Step 2: Save the config
-      setImportStatus('Saving connection settings...');
-      await supabaseSync.updateConfig({
-        supabaseUrl: configFields.supabaseUrl,
-        databaseUrl: configFields.databaseUrl,
-        supabaseAnonKey: configFields.supabaseAnonKey,
-        supabaseServiceKey: configFields.supabaseServiceKey,
-      });
-
-      // Step 3: Test connection
-      setImportPhase('testing');
-      setImportStatus('Testing connection...');
-      const testResult = await supabaseSync.testConnection();
-      if (!testResult.success) {
-        throw new Error(`Connection test failed: ${testResult.message}`);
-      }
-
-      // Step 4: Setup schema
-      setImportPhase('schema');
-      setImportStatus('Verifying database schema...');
-      const schemaResult = await supabaseSync.setupSchema();
-      if (!schemaResult.success) {
-        throw new Error(`Schema setup failed: ${schemaResult.message}`);
-      }
-
-      // Step 5: Pull data from cloud
-      setImportPhase('syncing');
-      setImportStatus('Pulling data from cloud... this may take a moment');
-      const syncResult = await supabaseSync.initialSync('pull');
-      setImportStats(syncResult.stats);
-
-      // Step 6: Enable ongoing sync
-      setImportPhase('enabling');
-      setImportStatus('Enabling sync...');
-      await supabaseSync.updateConfig({ enabled: true });
-
-      setImportPhase('done');
-      setImportStatus('All data synced successfully!');
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Import failed';
-      setImportPhase('error');
-      setError(message);
-    }
-  };
-
-  const phaseLabel = (phase: ImportPhase): string => {
-    switch (phase) {
-      case 'importing': return 'Decrypting config';
-      case 'testing': return 'Testing connection';
-      case 'schema': return 'Setting up schema';
-      case 'syncing': return 'Syncing data';
-      case 'enabling': return 'Enabling sync';
-      case 'done': return 'Complete';
-      default: return '';
-    }
-  };
-
-  const IMPORT_PHASES: ImportPhase[] = ['importing', 'testing', 'schema', 'syncing', 'enabling', 'done'];
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) handleDismiss(); }}>
@@ -301,7 +182,7 @@ export default function OnboardingWizard({
             Welcome! Let&apos;s get you set up
           </DialogTitle>
           <DialogDescription>
-            {steps.length > 1 && step?.id !== 'choose-path' && (
+            {steps.length > 1 && (
               <span className="text-xs text-gray-400">
                 Step {currentStep + 1} of {steps.length}
               </span>
@@ -310,7 +191,7 @@ export default function OnboardingWizard({
         </DialogHeader>
 
         {/* Progress dots */}
-        {steps.length > 1 && step?.id !== 'choose-path' && (
+        {steps.length > 1 && (
           <div className="flex items-center justify-center gap-2">
             {steps.map((s, i) => (
               <div
@@ -328,131 +209,12 @@ export default function OnboardingWizard({
         )}
 
         <div className="py-2">
-          {step?.id !== 'choose-path' && step?.id !== 'import-sync' && (
-            <>
-              <h3 className="text-sm font-semibold text-gray-900 mb-1">{step?.title}</h3>
-              <p className="text-sm text-gray-500 mb-4">{step?.description}</p>
-            </>
-          )}
+          <h3 className="text-sm font-semibold text-gray-900 mb-1">{step?.title}</h3>
+          <p className="text-sm text-gray-500 mb-4">{step?.description}</p>
 
           {error && (
             <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2 mb-4">
               {error}
-            </div>
-          )}
-
-          {/* Choose Path Step */}
-          {step?.id === 'choose-path' && (
-            <div className="space-y-3">
-              <button
-                type="button"
-                onClick={handleChooseImport}
-                className="w-full flex items-start gap-4 p-4 border-2 border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50/50 transition-colors text-left cursor-pointer"
-              >
-                <div className="p-2 bg-blue-100 rounded-lg shrink-0">
-                  <Cloud className="w-6 h-6 text-blue-600" />
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-900">Join an existing team</div>
-                  <div className="text-sm text-gray-500 mt-0.5">
-                    Paste a config code (CTT:...) from another installation to sync all data from the cloud
-                  </div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleChooseFresh}
-                className="w-full flex items-start gap-4 p-4 border-2 border-gray-200 rounded-lg hover:border-green-300 hover:bg-green-50/50 transition-colors text-left cursor-pointer"
-              >
-                <div className="p-2 bg-green-100 rounded-lg shrink-0">
-                  <Monitor className="w-6 h-6 text-green-600" />
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-900">Start fresh</div>
-                  <div className="text-sm text-gray-500 mt-0.5">
-                    Set up your first client, job types, and business settings from scratch
-                  </div>
-                </div>
-              </button>
-            </div>
-          )}
-
-          {/* Import Sync Step */}
-          {step?.id === 'import-sync' && (
-            <div className="space-y-4">
-              {importPhase === 'input' && (
-                <>
-                  <h3 className="text-sm font-semibold text-gray-900 mb-1">Import Configuration</h3>
-                  <p className="text-sm text-gray-500 mb-4">
-                    Paste the config code from an existing installation. You can generate one from Settings &gt; Supabase &gt; Export Config on any connected machine.
-                  </p>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Config code
-                    </label>
-                    <textarea
-                      value={importCode}
-                      onChange={(e) => { setImportCode(e.target.value); setError(''); }}
-                      placeholder="CTT:..."
-                      rows={3}
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      autoFocus
-                    />
-                  </div>
-                </>
-              )}
-
-              {importPhase !== 'input' && (
-                <>
-                  <h3 className="text-sm font-semibold text-gray-900 mb-1">
-                    {importPhase === 'done' ? 'Setup Complete!' : 'Setting up...'}
-                  </h3>
-                  <div className="space-y-2">
-                    {IMPORT_PHASES.map((phase) => {
-                      const phaseIdx = IMPORT_PHASES.indexOf(phase);
-                      const currentIdx = IMPORT_PHASES.indexOf(importPhase);
-
-                      const isActive = phase === importPhase;
-                      const isCompleted = importPhase === 'done'
-                        ? true
-                        : phaseIdx < currentIdx;
-
-                      return (
-                        <div
-                          key={phase}
-                          className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm ${
-                            isActive ? 'bg-blue-50 text-blue-700 font-medium' :
-                            isCompleted ? 'text-green-700' :
-                            'text-gray-400'
-                          }`}
-                        >
-                          {isCompleted ? (
-                            <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
-                          ) : isActive && importPhase !== 'done' ? (
-                            <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                          ) : isActive && importPhase === 'done' ? (
-                            <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
-                          ) : (
-                            <div className="w-4 h-4 rounded-full border-2 border-gray-200 shrink-0" />
-                          )}
-                          {phaseLabel(phase)}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {importPhase !== 'done' && importPhase !== 'error' && (
-                    <p className="text-xs text-gray-500 italic mt-2">{importStatus}</p>
-                  )}
-
-                  {importPhase === 'done' && importStats && (
-                    <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
-                      Synced {importStats.pulled} records from the cloud. You&apos;re all set!
-                    </div>
-                  )}
-                </>
-              )}
             </div>
           )}
 
@@ -635,69 +397,31 @@ export default function OnboardingWizard({
 
         <DialogFooter className="flex items-center !justify-between">
           <div>
-            {step?.id === 'choose-path' ? null : step?.id === 'import-sync' && importPhase === 'input' ? (
+            {currentStep > 0 && (
               <Button variant="ghost" onClick={handleBack} disabled={saving}>
                 <ChevronLeft className="w-4 h-4" />
                 Back
               </Button>
-            ) : step?.id === 'import-sync' ? null : currentStep > 0 ? (
-              <Button variant="ghost" onClick={handleBack} disabled={saving}>
-                <ChevronLeft className="w-4 h-4" />
-                Back
-              </Button>
-            ) : setupPath === 'fresh' && needsClient ? (
-              <Button variant="ghost" onClick={handleBack} disabled={saving}>
-                <ChevronLeft className="w-4 h-4" />
-                Back
-              </Button>
-            ) : null}
+            )}
           </div>
           <div className="flex items-center gap-2">
-            {step?.id === 'choose-path' && (
-              <Button variant="ghost" onClick={handleDismiss}>
-                Skip for now
+            {step?.id === 'settings' && (
+              <Button variant="ghost" onClick={handleDismiss} disabled={saving}>
+                Skip
               </Button>
             )}
-            {step?.id === 'import-sync' && importPhase === 'input' && (
-              <Button
-                onClick={handleRunImport}
-                disabled={!importCode.trim() || !importCode.trim().startsWith('CTT:')}
-              >
-                Import & Sync
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            )}
-            {step?.id === 'import-sync' && importPhase === 'done' && (
-              <Button onClick={onComplete}>
-                Get Started
-              </Button>
-            )}
-            {step?.id === 'import-sync' && importPhase === 'error' && (
-              <Button variant="outline" onClick={() => { setImportPhase('input'); setError(''); }}>
-                Try Again
-              </Button>
-            )}
-            {step?.id !== 'choose-path' && step?.id !== 'import-sync' && (
-              <>
-                {step?.id === 'settings' && (
-                  <Button variant="ghost" onClick={handleDismiss} disabled={saving}>
-                    Skip
-                  </Button>
+            <Button onClick={handleNext} disabled={saving || !canProceed()}>
+              {saving
+                ? 'Saving...'
+                : isLastStep
+                ? 'Finish Setup'
+                : (
+                  <>
+                    Next
+                    <ChevronRight className="w-4 h-4" />
+                  </>
                 )}
-                <Button onClick={handleNext} disabled={saving || !canProceed()}>
-                  {saving
-                    ? 'Saving...'
-                    : isLastStep
-                    ? 'Finish Setup'
-                    : (
-                      <>
-                        Next
-                        <ChevronRight className="w-4 h-4" />
-                      </>
-                    )}
-                </Button>
-              </>
-            )}
+            </Button>
           </div>
         </DialogFooter>
       </DialogContent>

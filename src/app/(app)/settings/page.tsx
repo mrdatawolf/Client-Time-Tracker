@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Settings, Users, Briefcase, DollarSign, Plus, Pencil, Trash2, Key, Cloud, HardDrive, Download, RotateCcw, AlertTriangle, Loader2, CheckCircle, XCircle, Wrench } from 'lucide-react';
+import { Settings, Users, Briefcase, DollarSign, Plus, Pencil, Trash2, Cloud, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -16,17 +16,15 @@ import {
   jobTypes as jobTypesApi,
   rateTiers as rateTiersApi,
   settings as settingsApi,
-  database as databaseApi,
   type User,
   type JobType,
   type RateTier,
-  type DbBackup,
 } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 import { isPartner as checkIsPartner } from '@/lib/api-client';
-import SupabaseTab from './supabase-tab';
+import CloudTab from './supabase-tab';
 
-type Tab = 'general' | 'users' | 'jobTypes' | 'rateTiers' | 'supabase' | 'database';
+type Tab = 'general' | 'users' | 'jobTypes' | 'rateTiers' | 'cloud';
 
 export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>('general');
@@ -36,8 +34,7 @@ export default function SettingsPage() {
     { key: 'users', label: 'Users', icon: Users },
     { key: 'jobTypes', label: 'Job Types', icon: Briefcase },
     { key: 'rateTiers', label: 'Rate Tiers', icon: DollarSign },
-    { key: 'supabase', label: 'Supabase Sync', icon: Cloud },
-    { key: 'database', label: 'Database', icon: HardDrive },
+    { key: 'cloud', label: 'Connection', icon: Cloud },
   ];
 
   return (
@@ -72,8 +69,7 @@ export default function SettingsPage() {
       {tab === 'users' && <UsersTab />}
       {tab === 'jobTypes' && <JobTypesTab />}
       {tab === 'rateTiers' && <RateTiersTab />}
-      {tab === 'supabase' && <SupabaseTab />}
-      {tab === 'database' && <DatabaseTab />}
+      {tab === 'cloud' && <CloudTab />}
     </div>
   );
 }
@@ -223,19 +219,21 @@ function UsersTab() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [resetPwUser, setResetPwUser] = useState<User | null>(null);
+  const [approveUser, setApproveUser] = useState<User | null>(null);
+  const [error, setError] = useState('');
 
   // Form state
-  const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
   const [role, setRole] = useState<'partner' | 'admin' | 'basic'>('basic');
   const currentUserIsPartner = checkIsPartner();
   const [saving, setSaving] = useState(false);
 
-  // Reset password state
-  const [newPassword, setNewPassword] = useState('');
-  const [resetSaving, setResetSaving] = useState(false);
+  // Approve dialog state
+  const [approveMode, setApproveMode] = useState<'new' | 'link'>('new');
+  const [approveRole, setApproveRole] = useState<'partner' | 'admin' | 'basic'>('basic');
+  const [linkTargetId, setLinkTargetId] = useState('');
+  const [approveSaving, setApproveSaving] = useState(false);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -250,39 +248,71 @@ function UsersTab() {
 
   useEffect(() => { loadUsers(); }, [loadUsers]);
 
+  const pendingUsers = userList.filter((u) => u.status === 'pending');
+  // Users a pending signup can be linked onto: existing rows with no auth account
+  const linkableUsers = userList.filter((u) => !u.authUserId && u.status !== 'pending');
+
   function openCreate() {
     setEditingUser(null);
-    setUsername('');
     setDisplayName('');
-    setPassword('');
+    setEmail('');
     setRole('basic');
+    setError('');
     setDialogOpen(true);
   }
 
   function openEdit(user: User) {
     setEditingUser(user);
-    setUsername(user.username);
     setDisplayName(user.displayName);
-    setPassword('');
+    setEmail(user.email || '');
     setRole(user.role);
+    setError('');
     setDialogOpen(true);
+  }
+
+  function openApprove(user: User) {
+    setApproveUser(user);
+    setApproveMode(linkableUsers.length > 0 ? 'link' : 'new');
+    setApproveRole('basic');
+    setLinkTargetId(linkableUsers[0]?.id || '');
+    setError('');
   }
 
   async function handleSave() {
     setSaving(true);
+    setError('');
     try {
       if (editingUser) {
-        await usersApi.update(editingUser.id, { displayName, role });
+        await usersApi.update(editingUser.id, { displayName, role, email: email || undefined });
       } else {
-        if (!username || !displayName || !password) return;
-        await usersApi.create({ username, displayName, password, role });
+        if (!displayName || !email) return;
+        await usersApi.create({ displayName, email, role });
       }
       setDialogOpen(false);
       loadUsers();
     } catch (err) {
-      console.error('Failed to save user:', err);
+      setError(err instanceof Error ? err.message : 'Failed to save user');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleApprove() {
+    if (!approveUser) return;
+    setApproveSaving(true);
+    setError('');
+    try {
+      if (approveMode === 'link' && linkTargetId) {
+        await usersApi.linkPending(approveUser.id, linkTargetId);
+      } else {
+        await usersApi.approve(approveUser.id, approveRole);
+      }
+      setApproveUser(null);
+      loadUsers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to approve user');
+    } finally {
+      setApproveSaving(false);
     }
   }
 
@@ -295,31 +325,32 @@ function UsersTab() {
     }
   }
 
-  async function handleResetPassword() {
-    if (!resetPwUser || !newPassword) return;
-    setResetSaving(true);
-    try {
-      await usersApi.update(resetPwUser.id, { displayName: resetPwUser.displayName } as never);
-      // The users route accepts password in the PUT body
-      const token = localStorage.getItem('ctt_token');
-      const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3701';
-      await fetch(`${base}/api/users/${resetPwUser.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ password: newPassword }),
-      });
-      setResetPwUser(null);
-      setNewPassword('');
-    } catch (err) {
-      console.error('Failed to reset password:', err);
-    } finally {
-      setResetSaving(false);
-    }
-  }
-
   return (
     <>
-      <div className="flex justify-end mb-4">
+      {pendingUsers.length > 0 && (
+        <div className="mb-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-2 flex items-center gap-1.5">
+            <UserCheck className="w-4 h-4" />
+            Waiting for approval
+          </h3>
+          <div className="space-y-2">
+            {pendingUsers.map((user) => (
+              <div key={user.id} className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-md px-3 py-2 border border-amber-100 dark:border-amber-900">
+                <div>
+                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{user.displayName}</span>
+                  <span className="text-xs text-gray-500 ml-2">{user.email}</span>
+                </div>
+                <Button size="sm" onClick={() => openApprove(user)}>Approve</Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Users with an email sign themselves up and link automatically. Passwords are managed by each user.
+        </p>
         <Button onClick={openCreate}>
           <Plus className="w-4 h-4 mr-1" /> Add User
         </Button>
@@ -332,8 +363,8 @@ function UsersTab() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Username</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Display Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -342,8 +373,13 @@ function UsersTab() {
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {userList.map((user) => (
                 <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                  <td className="px-6 py-3 font-medium text-gray-900 dark:text-gray-100">{user.username}</td>
-                  <td className="px-6 py-3 text-gray-600 dark:text-gray-400">{user.displayName}</td>
+                  <td className="px-6 py-3 font-medium text-gray-900 dark:text-gray-100">
+                    {user.displayName}
+                    {!user.authUserId && user.status !== 'pending' && (
+                      <span className="ml-2 text-xs text-gray-400" title="No login yet — when they sign up with the email shown, their account links automatically">no login yet</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-3 text-gray-600 dark:text-gray-400">{user.email || '—'}</td>
                   <td className="px-6 py-3">
                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                       user.role === 'partner' ? 'bg-amber-100 text-amber-700' :
@@ -354,9 +390,10 @@ function UsersTab() {
                   </td>
                   <td className="px-6 py-3 text-center">
                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                      user.status === 'pending' ? 'bg-amber-100 text-amber-700' :
                       user.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
                     }`}>
-                      {user.isActive ? 'Active' : 'Inactive'}
+                      {user.status === 'pending' ? 'Pending' : user.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </td>
                   <td className="px-6 py-3 text-right">
@@ -364,11 +401,13 @@ function UsersTab() {
                       <span className="text-xs text-gray-400">—</span>
                     ) : (
                       <div className="flex justify-end gap-1">
+                        {user.status === 'pending' && (
+                          <Button variant="ghost" size="sm" onClick={() => openApprove(user)} title="Approve">
+                            <UserCheck className="w-3.5 h-3.5 text-green-600" />
+                          </Button>
+                        )}
                         <Button variant="ghost" size="sm" onClick={() => openEdit(user)} title="Edit">
                           <Pencil className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => { setResetPwUser(user); setNewPassword(''); }} title="Reset Password">
-                          <Key className="w-3.5 h-3.5" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -395,22 +434,17 @@ function UsersTab() {
             <DialogTitle>{editingUser ? 'Edit User' : 'Add User'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {!editingUser && (
-              <div className="space-y-1">
-                <label className="text-sm font-medium">Username</label>
-                <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="username" />
-              </div>
-            )}
             <div className="space-y-1">
               <label className="text-sm font-medium">Display Name</label>
               <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Full Name" />
             </div>
-            {!editingUser && (
-              <div className="space-y-1">
-                <label className="text-sm font-medium">Password</label>
-                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" />
-              </div>
-            )}
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Email</label>
+              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@example.com" />
+              {!editingUser && (
+                <p className="text-xs text-gray-400">When they sign up with this email, their account links automatically.</p>
+              )}
+            </div>
             <div className="space-y-1">
               <label className="text-sm font-medium">Role</label>
               <select
@@ -423,32 +457,81 @@ function UsersTab() {
                 {currentUserIsPartner && <option value="partner">Partner</option>}
               </select>
             </div>
+            {error && <p className="text-sm text-red-600">{error}</p>}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button onClick={handleSave} disabled={saving || !displayName || (!editingUser && !email)}>
               {saving ? 'Saving...' : editingUser ? 'Update' : 'Create'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Reset Password Dialog */}
-      <Dialog open={!!resetPwUser} onOpenChange={() => setResetPwUser(null)}>
+      {/* Approve Pending User Dialog */}
+      <Dialog open={!!approveUser} onOpenChange={() => setApproveUser(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Reset Password for {resetPwUser?.displayName}</DialogTitle>
+            <DialogTitle>Approve {approveUser?.displayName}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-sm font-medium">New Password</label>
-              <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="New password" />
-            </div>
+            <p className="text-sm text-gray-500">{approveUser?.email}</p>
+
+            {linkableUsers.length > 0 && (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setApproveMode('link')}
+                  className={`flex-1 px-3 py-2 rounded-md border text-sm ${approveMode === 'link' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' : 'border-gray-200 dark:border-gray-600 text-gray-500'}`}
+                >
+                  Link to existing user
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setApproveMode('new')}
+                  className={`flex-1 px-3 py-2 rounded-md border text-sm ${approveMode === 'new' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' : 'border-gray-200 dark:border-gray-600 text-gray-500'}`}
+                >
+                  Approve as new user
+                </button>
+              </div>
+            )}
+
+            {approveMode === 'link' && linkableUsers.length > 0 ? (
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Existing user (keeps their history)</label>
+                <select
+                  value={linkTargetId}
+                  onChange={(e) => setLinkTargetId(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 h-10"
+                >
+                  {linkableUsers.map((u) => (
+                    <option key={u.id} value={u.id}>{u.displayName} ({u.role})</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400">
+                  The sign-in becomes this user — their time entries and history stay attached.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Role</label>
+                <select
+                  value={approveRole}
+                  onChange={(e) => setApproveRole(e.target.value as 'partner' | 'admin' | 'basic')}
+                  className="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 h-10"
+                >
+                  <option value="basic">Basic</option>
+                  <option value="admin">Admin</option>
+                  {currentUserIsPartner && <option value="partner">Partner</option>}
+                </select>
+              </div>
+            )}
+            {error && <p className="text-sm text-red-600">{error}</p>}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setResetPwUser(null)}>Cancel</Button>
-            <Button onClick={handleResetPassword} disabled={resetSaving || !newPassword}>
-              {resetSaving ? 'Saving...' : 'Reset Password'}
+            <Button variant="outline" onClick={() => setApproveUser(null)}>Cancel</Button>
+            <Button onClick={handleApprove} disabled={approveSaving}>
+              {approveSaving ? 'Approving...' : 'Approve'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -748,336 +831,5 @@ function RateTiersTab() {
         </DialogContent>
       </Dialog>
     </>
-  );
-}
-
-// ============ Database Tab ============
-
-function DatabaseTab() {
-  const [dbPath, setDbPath] = useState('');
-  const [dbSize, setDbSize] = useState(0);
-  const [backups, setBackups] = useState<DbBackup[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [backingUp, setBackingUp] = useState(false);
-  const [restoringName, setRestoringName] = useState<string | null>(null);
-  const [deletingName, setDeletingName] = useState<string | null>(null);
-
-  // Reset confirmation
-  const [showResetDialog, setShowResetDialog] = useState(false);
-  const [resetConfirmText, setResetConfirmText] = useState('');
-  const [resetting, setResetting] = useState(false);
-
-  // Restore confirmation
-  const [showRestoreDialog, setShowRestoreDialog] = useState(false);
-  const [restoreTarget, setRestoreTarget] = useState<string | null>(null);
-
-  // Migrations
-  const [runningMigrations, setRunningMigrations] = useState(false);
-  const [migrationResult, setMigrationResult] = useState<{ success: boolean; message: string } | null>(null);
-
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  const loadData = useCallback(async () => {
-    try {
-      const [info, backupList] = await Promise.all([
-        databaseApi.info(),
-        databaseApi.listBackups(),
-      ]);
-      setDbPath(info.path);
-      setDbSize(info.sizeMB);
-      setBackups(backupList);
-    } catch (err) {
-      console.error('Failed to load database info:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { loadData(); }, [loadData]);
-
-  function showMsg(type: 'success' | 'error', text: string) {
-    setMessage({ type, text });
-    setTimeout(() => setMessage(null), 4000);
-  }
-
-  async function handleBackup() {
-    setBackingUp(true);
-    try {
-      const result = await databaseApi.backup();
-      showMsg('success', `Backup created: ${result.name} (${result.sizeMB} MB)`);
-      loadData();
-    } catch (err) {
-      showMsg('error', `Backup failed: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setBackingUp(false);
-    }
-  }
-
-  async function handleRestore(name: string) {
-    setRestoringName(name);
-    try {
-      await databaseApi.restore(name);
-      showMsg('success', 'Database restored. The server needs to restart to load the restored data.');
-    } catch (err) {
-      showMsg('error', `Restore failed: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setRestoringName(null);
-      setShowRestoreDialog(false);
-      setRestoreTarget(null);
-    }
-  }
-
-  async function handleDeleteBackup(name: string) {
-    setDeletingName(name);
-    try {
-      await databaseApi.deleteBackup(name);
-      showMsg('success', 'Backup deleted.');
-      loadData();
-    } catch (err) {
-      showMsg('error', `Delete failed: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setDeletingName(null);
-    }
-  }
-
-  async function handleReset() {
-    if (resetConfirmText !== 'DELETE') return;
-    setResetting(true);
-    try {
-      await databaseApi.reset();
-      showMsg('success', 'Database deleted. The server needs to restart to create a fresh database.');
-    } catch (err) {
-      showMsg('error', `Reset failed: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setResetting(false);
-      setShowResetDialog(false);
-      setResetConfirmText('');
-    }
-  }
-
-  async function handleRunMigrations() {
-    setRunningMigrations(true);
-    setMigrationResult(null);
-    try {
-      const result = await databaseApi.runMigrations();
-      setMigrationResult(result);
-    } catch (err) {
-      setMigrationResult({ success: false, message: err instanceof Error ? err.message : 'Migration failed' });
-    } finally {
-      setRunningMigrations(false);
-    }
-  }
-
-  function formatBackupDate(dateStr: string) {
-    try {
-      return new Date(dateStr).toLocaleString();
-    } catch {
-      return dateStr;
-    }
-  }
-
-  if (loading) {
-    return <div className="p-8 text-center text-gray-500 dark:text-gray-400">Loading...</div>;
-  }
-
-  return (
-    <div className="space-y-6 max-w-2xl">
-      {/* Status message */}
-      {message && (
-        <div className={`px-4 py-3 rounded-md text-sm ${
-          message.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
-        }`}>
-          {message.text}
-        </div>
-      )}
-
-      {/* Database Info */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm p-6">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
-          <HardDrive className="w-5 h-5" />
-          Database Info
-        </h2>
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-gray-500">Location</span>
-            <span className="text-gray-900 font-mono text-xs break-all text-right max-w-[70%]">{dbPath}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-500">Size</span>
-            <span className="text-gray-900 dark:text-gray-100">{dbSize} MB</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Migrations */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm p-6">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2 flex items-center gap-2">
-          <Wrench className="w-5 h-5" />
-          Migrations
-        </h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-          Re-apply all database schema migrations. Use this if you&apos;re experiencing errors after an update.
-        </p>
-        <Button onClick={handleRunMigrations} disabled={runningMigrations} size="sm">
-          {runningMigrations ? (
-            <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Running...</>
-          ) : (
-            <><Wrench className="w-4 h-4 mr-1" /> Run Migrations</>
-          )}
-        </Button>
-        {migrationResult && (
-          <div className={`mt-3 flex items-start gap-2 text-sm ${
-            migrationResult.success ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'
-          }`}>
-            {migrationResult.success ? <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" /> : <XCircle className="w-4 h-4 mt-0.5 shrink-0" />}
-            <span>{migrationResult.message}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Backups */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-            <Download className="w-5 h-5" />
-            Backups
-          </h2>
-          <Button onClick={handleBackup} disabled={backingUp} size="sm">
-            {backingUp ? (
-              <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Creating...</>
-            ) : (
-              <><Plus className="w-4 h-4 mr-1" /> Create Backup</>
-            )}
-          </Button>
-        </div>
-
-        {backups.length === 0 ? (
-          <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">No backups yet. Create one to save a snapshot of your database.</p>
-        ) : (
-          <div className="space-y-2">
-            {backups.map((backup) => (
-              <div key={backup.name} className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-700 rounded-md">
-                <div className="text-sm">
-                  <div className="font-medium text-gray-900 dark:text-gray-100">{backup.name}</div>
-                  <div className="text-gray-500 text-xs">
-                    {formatBackupDate(backup.createdAt)} &middot; {backup.sizeMB} MB
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => { setRestoreTarget(backup.name); setShowRestoreDialog(true); }}
-                    disabled={restoringName === backup.name}
-                  >
-                    {restoringName === backup.name ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <><RotateCcw className="w-3.5 h-3.5 mr-1" /> Restore</>
-                    )}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDeleteBackup(backup.name)}
-                    disabled={deletingName === backup.name}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    {deletingName === backup.name ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Trash2 className="w-3.5 h-3.5" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Danger Zone */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-red-200 dark:border-red-900/50 shadow-sm p-6">
-        <h2 className="text-lg font-semibold text-red-700 dark:text-red-400 mb-2 flex items-center gap-2">
-          <AlertTriangle className="w-5 h-5" />
-          Danger Zone
-        </h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Permanently delete the local database. All data will be lost unless you have a backup or Supabase sync enabled.
-        </p>
-        <Button
-          variant="destructive"
-          onClick={() => setShowResetDialog(true)}
-        >
-          <Trash2 className="w-4 h-4 mr-1" /> Delete Database
-        </Button>
-      </div>
-
-      {/* Restore Confirmation Dialog */}
-      <Dialog open={showRestoreDialog} onOpenChange={(open) => { if (!open) { setShowRestoreDialog(false); setRestoreTarget(null); } }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Restore Database from Backup</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            This will replace your current database with the backup <span className="font-medium">{restoreTarget}</span>.
-            Any changes made since this backup was created will be lost.
-          </p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            The server will need to restart after restoring.
-          </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowRestoreDialog(false); setRestoreTarget(null); }}>Cancel</Button>
-            <Button
-              onClick={() => restoreTarget && handleRestore(restoreTarget)}
-              disabled={restoringName !== null}
-            >
-              {restoringName ? (
-                <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Restoring...</>
-              ) : (
-                <><RotateCcw className="w-4 h-4 mr-1" /> Restore</>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Reset Confirmation Dialog */}
-      <Dialog open={showResetDialog} onOpenChange={(open) => { if (!open) { setShowResetDialog(false); setResetConfirmText(''); } }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="text-red-700">Delete Database</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              This will permanently delete all local data including clients, time entries, invoices, and settings.
-              This action cannot be undone.
-            </p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Type <span className="font-mono font-bold text-red-600">DELETE</span> to confirm:
-            </p>
-            <Input
-              value={resetConfirmText}
-              onChange={(e) => setResetConfirmText(e.target.value)}
-              placeholder="Type DELETE to confirm"
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowResetDialog(false); setResetConfirmText(''); }}>Cancel</Button>
-            <Button
-              variant="destructive"
-              onClick={handleReset}
-              disabled={resetConfirmText !== 'DELETE' || resetting}
-            >
-              {resetting ? (
-                <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Deleting...</>
-              ) : (
-                <><Trash2 className="w-4 h-4 mr-1" /> Delete Everything</>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
   );
 }

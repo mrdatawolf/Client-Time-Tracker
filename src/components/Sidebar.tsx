@@ -17,17 +17,12 @@ import {
   Handshake,
   ScrollText,
   FolderKanban,
-  RefreshCw,
-  Wifi,
-  Ban,
   Menu,
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { clearToken, getUser } from '@/lib/api-client';
-import { supabaseSync, type SyncStatus } from '@/lib/api';
+import { signOut, getUser } from '@/lib/api-client';
 import { ThemeToggle } from './ThemeToggle';
-import { toast } from 'sonner';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -49,59 +44,14 @@ export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const user = getUser();
-  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
-  const [syncing, setSyncing] = useState(false);
-
-  const isAdminOrPartner = user?.role === 'admin' || user?.role === 'partner';
 
   // Close mobile drawer on navigation
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
 
-  // Load sync status and poll
-  useEffect(() => {
-    if (!isAdminOrPartner) return;
-    let cancelled = false;
-
-    async function fetchStatus() {
-      try {
-        const s = await supabaseSync.getStatus();
-        if (!cancelled) setSyncStatus(s);
-      } catch {
-        // Not configured or not admin — ignore
-      }
-    }
-
-    fetchStatus();
-    const interval = setInterval(fetchStatus, 15000);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, [isAdminOrPartner]);
-
-
-  async function handleSync() {
-    setSyncing(true);
-    try {
-      const result = await supabaseSync.sync();
-      setSyncStatus(await supabaseSync.getStatus());
-      toast.success('Sync complete', {
-        description: `Pushed ${result.pushed} and pulled ${result.pulled} records.`,
-      });
-    } catch (err) {
-      const errorMessage = (err as any)?.body?.error || (err as Error).message || 'An unknown error occurred.';
-      toast.error('Sync failed', {
-        description: errorMessage,
-      });
-      // Also update status to show error state
-      try {
-        setSyncStatus(await supabaseSync.getStatus());
-      } catch {} // ignore if status fetch fails
-    }
-    finally { setSyncing(false); }
-  }
-
-  const handleLogout = () => {
-    clearToken();
+  const handleLogout = async () => {
+    await signOut();
     window.location.href = '/login';
   };
 
@@ -191,36 +141,6 @@ export function Sidebar() {
         )}
       </nav>
 
-      {/* Sync status */}
-      {syncStatus?.enabled && syncStatus.state !== 'disabled' && (
-        <div className="border-t border-gray-700 px-3 py-2">
-          <div className="flex items-center gap-2">
-            <SidebarSyncIndicator state={syncing ? 'syncing' : syncStatus.state} />
-            {(!collapsed || mobileOpen) && (
-              <span className="text-xs text-gray-400 truncate flex-1">
-                {syncing
-                  ? 'Syncing...'
-                  : syncStatus.state === 'idle'
-                    ? `Synced${syncStatus.pendingCount > 0 ? ` (${syncStatus.pendingCount})` : ''}`
-                    : syncStatus.state === 'error'
-                      ? 'Sync error'
-                      : syncStatus.state === 'offline'
-                        ? 'Offline'
-                        : 'Syncing...'}
-              </span>
-            )}
-            <button
-              onClick={handleSync}
-              disabled={syncing}
-              className="p-1 rounded hover:bg-gray-700 transition-colors"
-              title="Sync now"
-            >
-              <RefreshCw className={cn('w-3.5 h-3.5 text-gray-400', syncing && 'animate-spin')} />
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Theme toggle */}
       <div className={cn('border-t border-gray-700 px-3 py-2', collapsed && !mobileOpen && 'flex justify-center')}>
         <ThemeToggle collapsed={collapsed && !mobileOpen} />
@@ -290,18 +210,4 @@ export function Sidebar() {
       </aside>
     </>
   );
-}
-
-function SidebarSyncIndicator({ state }: { state: string }) {
-  switch (state) {
-    case 'idle':
-      return <Wifi className="w-3.5 h-3.5 text-green-400 shrink-0" />;
-    case 'syncing':
-      return <RefreshCw className="w-3.5 h-3.5 text-blue-400 animate-spin shrink-0" />;
-    case 'offline':
-    case 'error':
-      return <Ban className="w-3.5 h-3.5 text-red-400 shrink-0" />;
-    default:
-      return null;
-  }
 }

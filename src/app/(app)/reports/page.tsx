@@ -211,17 +211,15 @@ export default function ReportsPage() {
   }
 
   function handleTaxExport(type: 'annual-revenue' | 'partner-earnings' | 'payments-ledger') {
-    const url = reportsApi.taxExportUrl(taxYear, type);
-    window.open(url, '_blank');
+    reportsApi.taxExportCsv(taxYear, type).catch((err) => console.error('Export failed:', err));
   }
 
   function handleExport() {
-    const url = reportsApi.exportUrl({
+    reportsApi.exportCsv({
       dateFrom,
       dateTo,
       clientId: clientFilter || undefined,
-    });
-    window.open(url, '_blank');
+    }).catch((err) => console.error('Export failed:', err));
   }
 
   function openEdit(entry: BalanceEntry) {
