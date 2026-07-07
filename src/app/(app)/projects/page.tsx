@@ -461,7 +461,7 @@ function StatusChip({
         <ChevronDown className="w-3 h-3" />
       </button>
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 py-1 min-w-[180px]">
+        <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20 py-1 min-w-[180px]">
           {ALL_STATUSES.map((s) => {
             const sc = STATUS_CONFIG[s];
             return (
@@ -510,9 +510,9 @@ function ClientCard({
   chatActive: boolean;
 }) {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
+    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
       {/* Client header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 rounded-t-lg">
         <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">{client.name}</h3>
         <div className="flex items-center gap-1">
           <Button
@@ -535,7 +535,7 @@ function ClientCard({
         {projects.map((project) => (
           <div
             key={project.id}
-            className="px-4 py-2.5 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 group"
+            className="px-4 py-2.5 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 group last:rounded-b-lg"
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
