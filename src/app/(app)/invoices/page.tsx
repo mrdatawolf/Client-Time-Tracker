@@ -160,7 +160,7 @@ export default function InvoicesPage() {
                   </td>
                   <td className="px-3 md:px-6 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <Link href={`/invoices/${inv.id}`}>
+                      <Link href={`/invoices/view?id=${inv.id}`}>
                         <Button variant="ghost" size="sm">
                           <Eye className="w-4 h-4" />
                         </Button>

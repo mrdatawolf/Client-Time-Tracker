@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Cloud, Copy, Check, Unplug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { getStoredConfig, encodeConfig, clearConfig, REQUIRED_SCHEMA_VERSION } from '@/lib/supabase';
+import { getStoredConfig, encodeConfig, clearConfig, REQUIRED_SCHEMA_VERSION, BASE_PATH } from '@/lib/supabase';
 import { signOut } from '@/lib/api-client';
 
 /**
@@ -26,7 +26,7 @@ export default function CloudTab() {
   async function handleDisconnect() {
     await signOut();
     clearConfig();
-    window.location.href = '/connect';
+    window.location.href = `${BASE_PATH}/connect`;
   }
 
   if (!config) {

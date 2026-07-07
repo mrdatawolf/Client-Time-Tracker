@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { ArrowLeft, FileText, DollarSign, Trash2, Download, Plus, Pencil, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,9 +41,18 @@ const STATUS_TRANSITIONS: Record<string, { label: string; value: string }[]> = {
 };
 
 export default function InvoiceDetailPage() {
-  const params = useParams();
+  // useSearchParams requires a Suspense boundary under static export
+  return (
+    <Suspense fallback={<div className="p-6 text-gray-500">Loading...</div>}>
+      <InvoiceDetail />
+    </Suspense>
+  );
+}
+
+function InvoiceDetail() {
+  const searchParams = useSearchParams();
   const router = useRouter();
-  const id = params.id as string;
+  const id = searchParams.get('id') as string;
 
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [paymentList, setPaymentList] = useState<Payment[]>([]);

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { signOut, getUser } from '@/lib/api-client';
+import { BASE_PATH } from '@/lib/supabase';
 import { ThemeToggle } from './ThemeToggle';
 
 const navItems = [
@@ -52,7 +53,7 @@ export function Sidebar() {
 
   const handleLogout = async () => {
     await signOut();
-    window.location.href = '/login';
+    window.location.href = `${BASE_PATH}/login`;
   };
 
   const sidebarContent = (

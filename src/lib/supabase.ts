@@ -9,6 +9,9 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 export const REQUIRED_SCHEMA_VERSION = 1;
 
+/** Subpath the app is served from (e.g. /Client-Time-Tracker on GitHub Pages). */
+export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || '';
+
 const CONFIG_KEY = 'ctt_supabase_config';
 const CONFIG_PREFIX = 'CTTW:';
 
@@ -72,8 +75,8 @@ export function getSupabase(): SupabaseClient {
   if (client) return client;
   const config = getStoredConfig();
   if (!config) {
-    if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/connect')) {
-      window.location.href = '/connect';
+    if (typeof window !== 'undefined' && !window.location.pathname.startsWith(`${BASE_PATH}/connect`)) {
+      window.location.href = `${BASE_PATH}/connect`;
     }
     throw new Error('No Supabase connection configured');
   }
