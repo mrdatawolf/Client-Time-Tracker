@@ -24,6 +24,8 @@ import { cn } from '@/lib/utils';
 import { signOut, getUser } from '@/lib/api-client';
 import { BASE_PATH } from '@/lib/supabase';
 import { ThemeToggle } from './ThemeToggle';
+import ClientSelector from './ClientSelector';
+import { useSelectedClient } from './SelectedClientProvider';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -40,11 +42,17 @@ const adminItems = [
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
+const CLIENT_SELECTOR_ROUTES = ['/time-entry', '/invoices', '/reports'];
+
 export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const user = getUser();
+  const { selectedClientId, setSelectedClientId } = useSelectedClient();
+  const showClientSelector = CLIENT_SELECTOR_ROUTES.some(
+    (r) => pathname === r || pathname.startsWith(r + '/')
+  );
 
   // Close mobile drawer on navigation
   useEffect(() => {
@@ -83,6 +91,19 @@ export function Sidebar() {
           )}
         </button>
       </div>
+
+      {/* Global client selector */}
+      {showClientSelector && (!collapsed || mobileOpen) && (
+        <div className="px-3 py-3 border-b border-gray-700">
+          <label className="block text-xs font-medium text-gray-400 mb-1">Client</label>
+          <ClientSelector
+            value={selectedClientId}
+            onChange={setSelectedClientId}
+            className="w-full"
+            allowAll
+          />
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 py-4 overflow-y-auto">

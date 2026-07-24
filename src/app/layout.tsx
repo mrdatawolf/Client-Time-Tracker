@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { ThemeProvider } from '@/components/ThemeProvider';
+import { SelectedClientProvider } from '@/components/SelectedClientProvider';
 
 export const metadata: Metadata = {
   title: 'Client Time Tracker',
@@ -22,7 +23,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className="antialiased">
         <ThemeProvider>
-          {children}
+          <SelectedClientProvider>
+            {children}
+          </SelectedClientProvider>
         </ThemeProvider>
       </body>
     </html>

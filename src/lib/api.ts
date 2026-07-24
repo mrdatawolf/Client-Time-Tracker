@@ -338,10 +338,11 @@ export const timeEntries = {
     return (data ?? []).map(decorateEntry);
   },
 
-  grid: async (dateFrom: string, dateTo: string, clientId?: string): Promise<TimeEntry[]> => {
+  grid: async (dateFrom: string, dateTo: string, clientId?: string, techId?: string): Promise<TimeEntry[]> => {
     let q = db().from('time_entries').select(TIME_ENTRY_SELECT)
       .gte('date', dateFrom).lte('date', dateTo).order('date', { ascending: true });
     if (clientId) q = q.eq('client_id', clientId);
+    if (techId) q = q.eq('tech_id', techId);
     const { data, error } = await q;
     if (error) fail(error);
     return (data ?? []).map(decorateEntry);
@@ -748,6 +749,7 @@ export interface DateRangeEntry {
 export interface BalanceEntry {
   id: string;
   date: string;
+  clientId: string;
   clientName: string;
   techName: string;
   jobTypeName: string;
@@ -1006,8 +1008,8 @@ export const reports = {
       `time-report-${filters?.dateFrom || 'all'}-${filters?.dateTo || 'all'}.csv`);
   },
 
-  balance: (clientId: string, filter?: 'all' | 'unbilled' | 'unpaid' | 'paid') =>
-    rpc<BalanceEntry[]>('report_balance', { p_client_id: clientId, p_filter: filter || 'all' }),
+  balance: (clientId?: string, filter?: 'all' | 'unbilled' | 'unpaid' | 'paid') =>
+    rpc<BalanceEntry[]>('report_balance', { p_client_id: clientId || null, p_filter: filter || 'all' }),
 
   markPaid: async (invoiceId: string): Promise<{ success: boolean }> => {
     await rpc('mark_invoice_paid', { p_invoice_id: invoiceId });

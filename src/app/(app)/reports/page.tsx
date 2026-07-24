@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { BarChart3, Download, Users, Briefcase, List, DollarSign, Pencil, Check, Clock, Timer, TrendingUp, UserCheck, FileText, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,13 +14,11 @@ import {
 } from '@/components/ui/dialog';
 import {
   reports as reportsApi,
-  clients as clientsApi,
   timeEntries as timeEntriesApi,
   type ClientSummary,
   type TechSummary,
   type DateRangeEntry,
   type BalanceEntry,
-  type Client,
   type PartnerSettlementReport,
   type PartnerBreakdownReport,
   type AgedReceivablesReport,
@@ -32,23 +31,23 @@ import {
 } from '@/lib/api';
 import { formatCurrency, formatDate, toISODate } from '@/lib/utils';
 import { isAdmin } from '@/lib/api-client';
+import { useSelectedClient } from '@/components/SelectedClientProvider';
 
 type Tab = 'client' | 'tech' | 'entries' | 'balance' | 'settlement' | 'partners' | 'aged' | 'wip' | 'profitability' | 'utilization' | 'tax';
 
-export default function ReportsPage() {
+function ReportsPageInner() {
+  const searchParams = useSearchParams();
   const admin = isAdmin();
+  const { selectedClientId, setSelectedClientId } = useSelectedClient();
   const [tab, setTab] = useState<Tab>('client');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [clientFilter, setClientFilter] = useState('');
-  const [clientList, setClientList] = useState<Client[]>([]);
   const [clientSummary, setClientSummary] = useState<ClientSummary[]>([]);
   const [techSummary, setTechSummary] = useState<TechSummary[]>([]);
   const [settlementData, setSettlementData] = useState<PartnerSettlementReport[]>([]);
   const [partnerBreakdownData, setPartnerBreakdownData] = useState<PartnerBreakdownReport[]>([]);
   const [partnerDateFrom, setPartnerDateFrom] = useState('');
   const [partnerDateTo, setPartnerDateTo] = useState('');
-  const [partnerClientFilter, setPartnerClientFilter] = useState('');
   const [agedData, setAgedData] = useState<AgedReceivablesReport | null>(null);
   const [wipData, setWipData] = useState<WipReport | null>(null);
   const [profitabilityData, setProfitabilityData] = useState<EffectiveRateReport[]>([]);
@@ -65,7 +64,6 @@ export default function ReportsPage() {
   const [expandedTaxSections, setExpandedTaxSections] = useState<Set<string>>(new Set(['revenue', 'earnings', 'payments']));
 
   // Balance tab state
-  const [balanceClient, setBalanceClient] = useState('');
   const [balanceFilter, setBalanceFilter] = useState<'all' | 'unbilled' | 'unpaid' | 'paid'>('all');
   const [balanceEntries, setBalanceEntries] = useState<BalanceEntry[]>([]);
   const [balanceLoading, setBalanceLoading] = useState(false);
@@ -93,14 +91,20 @@ export default function ReportsPage() {
     const jan1 = new Date(now.getFullYear(), 0, 1);
     setPartnerDateFrom(toISODate(jan1));
     setPartnerDateTo(toISODate(now));
-    clientsApi.list().then((clients) => {
-      setClientList(clients);
-      // Default balance client to first active client
-      const active = clients.filter(c => c.isActive);
-      if (active.length > 0 && !balanceClient) {
-        setBalanceClient(active[0].id);
-      }
-    }).catch(console.error);
+  }, []);
+
+  // Deep-link support (e.g. dashboard "Unbilled" card -> Balance tab, all clients, all outstanding)
+  useEffect(() => {
+    const urlTab = searchParams.get('tab');
+    if (!urlTab) return;
+    setTab(urlTab as Tab);
+    if (urlTab === 'balance') {
+      setSelectedClientId('');
+      const urlFilter = searchParams.get('filter');
+      if (urlFilter) setBalanceFilter(urlFilter as 'all' | 'unbilled' | 'unpaid' | 'paid');
+    }
+    // Only apply once, on landing
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadPartnerBreakdown = useCallback(async () => {
@@ -110,14 +114,14 @@ export default function ReportsPage() {
       setPartnerBreakdownData(await reportsApi.partnerBreakdown({
         dateFrom: partnerDateFrom,
         dateTo: partnerDateTo,
-        clientId: partnerClientFilter || undefined,
+        clientId: selectedClientId || undefined,
       }));
     } catch (err) {
       console.error('Failed to load partner breakdown:', err);
     } finally {
       setLoading(false);
     }
-  }, [partnerDateFrom, partnerDateTo, partnerClientFilter]);
+  }, [partnerDateFrom, partnerDateTo, selectedClientId]);
 
   useEffect(() => {
     if (tab === 'partners') loadPartnerBreakdown();
@@ -144,14 +148,14 @@ export default function ReportsPage() {
       } else if (tab === 'utilization') {
         setUtilizationData(await reportsApi.techUtilization(filters));
       } else {
-        setEntries(await reportsApi.dateRange({ ...filters, clientId: clientFilter || undefined }));
+        setEntries(await reportsApi.dateRange({ ...filters, clientId: selectedClientId || undefined }));
       }
     } catch (err) {
       console.error('Failed to load report:', err);
     } finally {
       setLoading(false);
     }
-  }, [tab, dateFrom, dateTo, clientFilter]);
+  }, [tab, dateFrom, dateTo, selectedClientId]);
 
   useEffect(() => {
     loadData();
@@ -159,16 +163,15 @@ export default function ReportsPage() {
 
   // Balance tab data loader
   const loadBalance = useCallback(async () => {
-    if (!balanceClient) return;
     setBalanceLoading(true);
     try {
-      setBalanceEntries(await reportsApi.balance(balanceClient, balanceFilter));
+      setBalanceEntries(await reportsApi.balance(selectedClientId || undefined, balanceFilter));
     } catch (err) {
       console.error('Failed to load balance:', err);
     } finally {
       setBalanceLoading(false);
     }
-  }, [balanceClient, balanceFilter]);
+  }, [selectedClientId, balanceFilter]);
 
   useEffect(() => {
     if (tab === 'balance') {
@@ -218,7 +221,7 @@ export default function ReportsPage() {
     reportsApi.exportCsv({
       dateFrom,
       dateTo,
-      clientId: clientFilter || undefined,
+      clientId: selectedClientId || undefined,
     }).catch((err) => console.error('Export failed:', err));
   }
 
@@ -343,19 +346,6 @@ export default function ReportsPage() {
             <label className="text-xs font-medium text-gray-500 dark:text-gray-400">To</label>
             <Input type="date" value={partnerDateTo} onChange={(e) => setPartnerDateTo(e.target.value)} className="w-40" />
           </div>
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Client</label>
-            <select
-              value={partnerClientFilter}
-              onChange={(e) => setPartnerClientFilter(e.target.value)}
-              className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 h-9"
-            >
-              <option value="">All Clients</option>
-              {clientList.filter(c => c.isActive).map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
         </div>
       ) : tab !== 'balance' ? (
         <div className="flex flex-wrap items-end gap-3 mb-6">
@@ -377,36 +367,9 @@ export default function ReportsPage() {
               className="w-40"
             />
           </div>
-          {tab === 'entries' && (
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Client</label>
-              <select
-                value={clientFilter}
-                onChange={(e) => setClientFilter(e.target.value)}
-                className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 h-9"
-              >
-                <option value="">All Clients</option>
-                {clientList.filter(c => c.isActive).map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-          )}
         </div>
       ) : (
         <div className="flex flex-wrap items-end gap-3 mb-6">
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Client</label>
-            <select
-              value={balanceClient}
-              onChange={(e) => setBalanceClient(e.target.value)}
-              className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 h-9"
-            >
-              {clientList.filter(c => c.isActive).map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Show</label>
             <select
@@ -1220,8 +1183,6 @@ export default function ReportsPage() {
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
           {balanceLoading ? (
             <div className="p-6 text-center text-gray-500 dark:text-gray-400">Loading...</div>
-          ) : !balanceClient ? (
-            <div className="p-6 text-center text-gray-500 dark:text-gray-400">Select a client to view outstanding items</div>
           ) : balanceEntries.length === 0 ? (
             <div className="p-6 text-center text-gray-500 dark:text-gray-400">
               {balanceFilter === 'paid' ? 'No paid items for this client' : 'No outstanding items for this client'}
@@ -1397,5 +1358,13 @@ export default function ReportsPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function ReportsPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-gray-500">Loading...</div>}>
+      <ReportsPageInner />
+    </Suspense>
   );
 }

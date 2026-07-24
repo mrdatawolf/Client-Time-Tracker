@@ -1196,7 +1196,7 @@ begin
 end
 $fn$;
 
-create or replace function public.report_balance(p_client_id uuid, p_filter text default 'all')
+create or replace function public.report_balance(p_client_id uuid default null, p_filter text default 'all')
 returns jsonb
 language plpgsql stable security definer set search_path = public, pg_temp
 as $fn$
@@ -1207,6 +1207,7 @@ begin
     select te.date as d, jsonb_build_object(
       'id', te.id,
       'date', to_char(te.date, 'YYYY-MM-DD'),
+      'clientId', te.client_id,
       'clientName', cl.name,
       'techName', u.display_name,
       'jobTypeName', jt.name,
@@ -1228,7 +1229,7 @@ begin
     join public.job_types jt on jt.id = te.job_type_id
     join public.clients cl on cl.id = te.client_id
     left join public.invoices i on i.id = te.invoice_id
-    where te.client_id = p_client_id
+    where (p_client_id is null or te.client_id = p_client_id)
       and case p_filter
         when 'unbilled' then not te.is_paid and not te.is_billed
         when 'unpaid' then not te.is_paid and te.is_billed

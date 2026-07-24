@@ -40,19 +40,20 @@ export default function Dashboard() {
       sunday.setDate(monday.getDate() + 6);
       const weekEnd = toISODate(sunday);
 
-      const [allEntries, unbilledEntries, clientList, allProjects] = await Promise.all([
+      const [allEntries, myWeekEntries, unbilledEntries, clientList, allProjects] = await Promise.all([
         timeEntriesApi.list({ dateFrom: weekStart, dateTo: weekEnd }),
+        timeEntriesApi.list({ techId: user?.id, dateFrom: weekStart, dateTo: weekEnd }),
         timeEntriesApi.list({ isBilled: false }),
         clientsApi.list(),
         projectsApi.list(),
       ]);
 
-      // Today's hours
+      // Today's hours (all techs)
       const todayEntries = allEntries.filter((e) => e.date === today);
       setTodayHours(todayEntries.reduce((sum, e) => sum + parseFloat(e.hours), 0));
 
-      // Week's hours
-      setWeekHours(allEntries.reduce((sum, e) => sum + parseFloat(e.hours), 0));
+      // This week's hours (current user only)
+      setWeekHours(myWeekEntries.reduce((sum, e) => sum + parseFloat(e.hours), 0));
 
       // Unbilled total (all unbilled, not just this week)
       setUnbilledTotal(
@@ -109,10 +110,22 @@ export default function Dashboard() {
     loadDashboard();
   }, [loadDashboard]);
 
-  const cards = [
+  const cards: { label: string; value: string; icon: typeof Clock; color: string; href?: string }[] = [
     { label: "Today's Hours", value: todayHours.toFixed(1) + 'h', icon: Clock, color: 'bg-blue-500' },
-    { label: "This Week", value: weekHours.toFixed(1) + 'h', icon: Clock, color: 'bg-green-500' },
-    { label: 'Unbilled', value: formatCurrency(unbilledTotal), icon: DollarSign, color: 'bg-amber-500' },
+    {
+      label: 'This Week',
+      value: weekHours.toFixed(1) + 'h',
+      icon: Clock,
+      color: 'bg-green-500',
+      href: user ? `/time-entry?techId=${user.id}` : undefined,
+    },
+    {
+      label: 'Unbilled',
+      value: formatCurrency(unbilledTotal),
+      icon: DollarSign,
+      color: 'bg-amber-500',
+      href: '/reports?tab=balance&filter=all',
+    },
     { label: 'Clients', value: String(clientCount), icon: Users, color: 'bg-purple-500' },
   ];
 
@@ -149,22 +162,33 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {cards.map((card) => (
-          <div
-            key={card.label}
-            className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 shadow-sm"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-sm font-medium text-gray-500 dark:text-gray-400">{card.label}</span>
-              <div className={`${card.color} p-2 rounded-lg`}>
-                <card.icon className="w-5 h-5 text-white" />
+        {cards.map((card) => {
+          const cardBody = (
+            <>
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-sm font-medium text-gray-500 dark:text-gray-400">{card.label}</span>
+                <div className={`${card.color} p-2 rounded-lg`}>
+                  <card.icon className="w-5 h-5 text-white" />
+                </div>
               </div>
+              <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                {loading ? '...' : card.value}
+              </div>
+            </>
+          );
+          const cardClassName = `bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 shadow-sm ${
+            card.href ? 'hover:border-gray-300 dark:hover:border-gray-600 transition-colors cursor-pointer' : ''
+          }`;
+          return card.href ? (
+            <Link key={card.label} href={card.href} className={cardClassName}>
+              {cardBody}
+            </Link>
+          ) : (
+            <div key={card.label} className={cardClassName}>
+              {cardBody}
             </div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {loading ? '...' : card.value}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Recent Projects */}
