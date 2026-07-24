@@ -1,15 +1,27 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Clock } from 'lucide-react';
-import ClientSelector from '@/components/ClientSelector';
+import { useSelectedClient } from '@/components/SelectedClientProvider';
 import DateRangePicker, { getDefaultDateFrom, getDefaultDateTo } from '@/components/DateRangePicker';
 import TimeEntryGrid from '@/components/TimeEntryGrid';
+import { users as usersApi, type User } from '@/lib/api';
+import { isAdmin } from '@/lib/api-client';
 
-export default function TimeEntryPage() {
-  const [clientId, setClientId] = useState('');
+function TimeEntryPageInner() {
+  const searchParams = useSearchParams();
+  const admin = isAdmin();
+  const { selectedClientId } = useSelectedClient();
   const [dateFrom, setDateFrom] = useState(getDefaultDateFrom);
   const [dateTo, setDateTo] = useState(getDefaultDateTo);
+  const [techId, setTechId] = useState(() => searchParams.get('techId') || '');
+  const [techList, setTechList] = useState<User[]>([]);
+
+  useEffect(() => {
+    if (!admin) return;
+    usersApi.list().then((list) => setTechList(list.filter((u) => u.isActive))).catch(console.error);
+  }, [admin]);
 
   return (
     <div>
@@ -22,21 +34,38 @@ export default function TimeEntryPage() {
       </div>
 
       <div className="flex flex-wrap items-end gap-4 mb-6">
-        <ClientSelector
-          value={clientId}
-          onChange={setClientId}
-          className="w-full sm:w-64"
-          allowAll
-        />
         <DateRangePicker
           dateFrom={dateFrom}
           dateTo={dateTo}
           onDateFromChange={setDateFrom}
           onDateToChange={setDateTo}
         />
+        {admin && (
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Person</label>
+            <select
+              value={techId}
+              onChange={(e) => setTechId(e.target.value)}
+              className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 h-9"
+            >
+              <option value="">Everyone</option>
+              {techList.map((t) => (
+                <option key={t.id} value={t.id}>{t.displayName}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
-      <TimeEntryGrid clientId={clientId} dateFrom={dateFrom} dateTo={dateTo} />
+      <TimeEntryGrid clientId={selectedClientId} dateFrom={dateFrom} dateTo={dateTo} techId={techId} />
     </div>
+  );
+}
+
+export default function TimeEntryPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-gray-500">Loading...</div>}>
+      <TimeEntryPageInner />
+    </Suspense>
   );
 }

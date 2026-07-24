@@ -8,6 +8,7 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import Link from 'next/link';
 import GenerateInvoiceDialog from '@/components/GenerateInvoiceDialog';
 import { toast } from 'sonner';
+import { useSelectedClient } from '@/components/SelectedClientProvider';
 
 const STATUS_STYLES: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-700',
@@ -17,10 +18,10 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 export default function InvoicesPage() {
+  const { selectedClientId } = useSelectedClient();
   const [invoiceList, setInvoiceList] = useState<Invoice[]>([]);
   const [clientList, setClientList] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterClient, setFilterClient] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [generateOpen, setGenerateOpen] = useState(false);
   const toastShownRef = useRef(false);
@@ -28,7 +29,7 @@ export default function InvoicesPage() {
   const loadInvoices = useCallback(async () => {
     try {
       const filters: { clientId?: string; status?: string } = {};
-      if (filterClient) filters.clientId = filterClient;
+      if (selectedClientId) filters.clientId = selectedClientId;
       if (filterStatus) filters.status = filterStatus;
       const data = await invoicesApi.list(filters);
       setInvoiceList(data);
@@ -48,7 +49,7 @@ export default function InvoicesPage() {
     } finally {
       setLoading(false);
     }
-  }, [filterClient, filterStatus]);
+  }, [selectedClientId, filterStatus]);
 
   useEffect(() => {
     clientsApi.list().then(setClientList).catch(console.error);
@@ -88,16 +89,6 @@ export default function InvoicesPage() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 mb-6">
-        <select
-          value={filterClient}
-          onChange={(e) => setFilterClient(e.target.value)}
-          className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
-        >
-          <option value="">All Clients</option>
-          {clientList.filter(c => c.isActive).map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}

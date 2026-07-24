@@ -12,6 +12,7 @@ interface TimeEntryGridProps {
   clientId: string;
   dateFrom: string;
   dateTo: string;
+  techId?: string;
 }
 
 const SHORT_DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -62,7 +63,7 @@ function isWeekAligned(from: string, to: string): boolean {
   return start.getDay() === 1 && numDays % 7 === 0;
 }
 
-export default function TimeEntryGrid({ clientId, dateFrom, dateTo }: TimeEntryGridProps) {
+export default function TimeEntryGrid({ clientId, dateFrom, dateTo, techId }: TimeEntryGridProps) {
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -85,7 +86,7 @@ export default function TimeEntryGrid({ clientId, dateFrom, dateTo }: TimeEntryG
     if (!dateFrom || !dateTo) return;
     setLoading(true);
     try {
-      const data = await timeEntriesApi.grid(dateFrom, dateTo, clientId || undefined);
+      const data = await timeEntriesApi.grid(dateFrom, dateTo, clientId || undefined, techId || undefined);
       setEntries(data);
       setSelectedIds(new Set());
     } catch (err) {
@@ -93,7 +94,7 @@ export default function TimeEntryGrid({ clientId, dateFrom, dateTo }: TimeEntryG
     } finally {
       setLoading(false);
     }
-  }, [clientId, dateFrom, dateTo]);
+  }, [clientId, dateFrom, dateTo, techId]);
 
   useEffect(() => {
     loadEntries();
