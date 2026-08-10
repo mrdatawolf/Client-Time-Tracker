@@ -41,3 +41,4 @@ temp-server-build/
 distribute/
 distribute_server/
 Examples/
+.claude/settings.local.json
