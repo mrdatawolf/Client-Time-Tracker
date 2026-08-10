@@ -33,8 +33,9 @@ jobs:
       - name: Build static export
         run: pnpm build
         env:
-          # Served from the repo subpath on github.io
-          NEXT_PUBLIC_BASE_PATH: /Client-Time-Tracker
+          # Served from the root of the custom domain (ctt.ztmoon.com) — no subpath.
+          # Only set NEXT_PUBLIC_BASE_PATH again if serving from a github.io subpath.
+          NEXT_PUBLIC_BASE_PATH: ''
 
       - uses: actions/configure-pages@v5
         with:
