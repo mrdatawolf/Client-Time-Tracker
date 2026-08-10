@@ -72,7 +72,7 @@ export default function ConnectPage() {
                   placeholder="CTTW:..."
                   required
                   autoFocus
-                  className="mt-1 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mt-1 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
                   rows={4}
                 />
                 <p className="text-xs text-gray-500 mt-1">

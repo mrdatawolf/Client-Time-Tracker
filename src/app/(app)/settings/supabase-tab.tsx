@@ -71,7 +71,7 @@ export default function CloudTab() {
             readOnly
             value={code}
             rows={3}
-            className="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 px-3 py-2 text-xs font-mono"
+            className="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-xs font-mono"
             onFocus={(e) => e.target.select()}
           />
           <Button variant="outline" onClick={handleCopy} className="shrink-0 self-start">
