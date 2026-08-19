@@ -7,10 +7,13 @@ import { timeEntries as timeEntriesApi, clients as clientsApi, projects as proje
 import { formatCurrency, toISODate, getWeekDates } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import OnboardingWizard from '@/components/OnboardingWizard';
+import QuickLogTimeCard from '@/components/QuickLogTimeCard';
+import { useIsMobile } from '@/lib/useIsMobile';
 import Link from 'next/link';
 
 export default function Dashboard() {
   const user = getUser();
+  const isMobile = useIsMobile();
   const [todayHours, setTodayHours] = useState(0);
   const [weekHours, setWeekHours] = useState(0);
   const [unbilledTotal, setUnbilledTotal] = useState(0);
@@ -153,13 +156,15 @@ export default function Dashboard() {
           </h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">Here&apos;s your time tracking overview</p>
         </div>
-        <Link href="/time-entry">
+        <Link href="/time-entry" className="hidden md:inline-flex">
           <Button>
             <Plus className="w-4 h-4 mr-2" />
             Log Time
           </Button>
         </Link>
       </div>
+
+      {isMobile && <QuickLogTimeCard onSaved={loadDashboard} />}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {cards.map((card) => {

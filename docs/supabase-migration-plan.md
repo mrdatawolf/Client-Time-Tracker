@@ -4,7 +4,11 @@
 static browser app that talks directly to Supabase. Zero installation: a user opens the hosted app URL,
 pastes an org config string, and works.
 
-**Status:** Planned 2026-07-02. Not started.
+**Status:** Planned 2026-07-02. **In progress as of 2026-08-19** — Phases 0, 1, 2 (mostly), and 4 are done;
+the app is live and Supabase-native in production use. Remaining: Phase 2 item 6 (Excel import), Phase 3
+(offline/PWA), Phase 5 (cutover/retirement of the legacy system). See per-phase status below — this line
+was stale relative to the code for a while, so re-verify against the code rather than trusting doc prose
+alone next time before making architectural assumptions.
 
 ## Decisions (locked)
 
@@ -61,14 +65,21 @@ ones above, not RLS.)
 Fallback strategy at cutover is not "both systems live" — it's "the frozen old install still exists and
 holds the data as of the freeze."
 
-## Phase 0 — Freeze the legacy system
+## Phase 0 — Freeze the legacy system — ✅ DONE
+
+`legacy-final` tag and a `legacy` branch both exist.
 
 1. Tag the current release (e.g. `legacy-final`) and cut a `legacy` branch from it. Any emergency bugfix
    for the old system happens there and gets rebuilt via the existing installer pipeline; `main` is now
    free to change destructively.
 2. Production installs keep running and syncing, untouched, until Phase 5.
 
-## Phase 1 — Canonical schema + security in SQL (`supabase/setup.sql`)
+## Phase 1 — Canonical schema + security in SQL (`supabase/setup.sql`) — ✅ DONE
+
+`supabase/setup.sql` (~1860 lines) implements RLS policies, audit triggers, `pg_cron` auto-invoicing, and
+the RPC functions below. Two gaps from the original list: no standalone `resolve_rate_tier` RPC (rate tier
+resolution happens via direct joins in client queries instead) and no `tax_export` RPC — revisit if either
+is actually needed.
 
 The deliverable is one idempotent, versioned SQL script (plus future `migrate-vN.sql` scripts):
 `CREATE TABLE IF NOT EXISTS`, `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, `CREATE OR REPLACE` for
@@ -110,35 +121,33 @@ production data.
 pending sees nothing, basic sees only own entries, basic cannot read invoices, etc.). Re-seed the test
 project destructively as often as needed — it's two commands.
 
-## Phase 2 — Convert the frontend in place (supabase-js replaces the REST client)
+## Phase 2 — Convert the frontend in place (supabase-js replaces the REST client) — ✅ MOSTLY DONE (item 6 open)
 
 The seam is `src/lib/api.ts` — every component already goes through typed functions
 (`timeEntriesApi`, `invoicesApi`, ...). Keep those signatures where convenient; there is no second
 backend to preserve, so signatures may also change freely where supabase-js fits better.
 
-1. **Connection config + onboarding** — new browser-safe config string (versioned `CTTW:` prefix or
-   similar) containing **only** project URL + anon key, AES-encrypted like the current export format.
-   Paste screen on first load; stored in localStorage. The old `CTT:` string (which contains the database
-   URL and service keys) is never accepted by the browser app.
-2. **Auth** — supabase-js session replaces `ctt_token`/`ctt_user` outright; login page becomes email
-   login + signup; add "pending approval" screen; `(app)/layout.tsx` guard uses the Supabase session;
-   `users.role`/`status` fetched into the user context. Delete the JWT/localStorage token plumbing.
-3. **Data layer** — rewrite `api.ts` module-by-module (each `*Api` group is one PR-sized unit) against
-   supabase-js + RPC. Numeric columns come back as strings from PostgREST just as they do from the
-   current API, so types mostly hold. The app will be partially broken between modules — that's fine,
-   nothing on `main` ships to production until cutover.
-4. **Admin approval UI** — user management page gains: pending list, activate + assign role,
-   "link to existing tech" (sets `auth_user_id` on the historical row instead of using the new stub row).
-5. **Reports/invoices → RPC calls**; **PDF in browser** — port `lib/invoice-generator.ts` (pdfkit has a
-   browser build; else pdf-lib) and render client-side from the same invoice data.
-6. **Excel import** (`routes/migrate.ts`) — parse client-side (`xlsx`), insert via supabase-js.
-7. **Schema version gate** — on connect, read `schema_meta`; if missing/stale, show the copy-paste-SQL
-   flow with the bundled script.
+1. ✅ DONE — **Connection config + onboarding** — `CTTW:` + base64 `{ url, anonKey }` config code,
+   `/connect` page, stored in localStorage (`ctt_supabase_config`, `src/lib/supabase.ts`).
+2. ✅ DONE — **Auth** — supabase-js session (`ctt_auth`, SDK-managed) replaces `ctt_token`; app user cached
+   separately in `ctt_user` (`src/lib/api-client.ts`); email login + signup; `/pending` approval-wait
+   screen; `(app)/layout.tsx` guard uses the Supabase session via `refreshCurrentUser()`.
+3. ✅ DONE — **Data layer** — `src/lib/api.ts` (~1255 lines) is fully supabase-js + RPC; `NEXT_PUBLIC_API_URL`
+   and the old REST client have zero remaining references in `src/`.
+4. ✅ DONE — **Admin approval UI** — `src/app/(app)/settings/page.tsx`: pending list, approve dialog with
+   "new user" vs. "link to existing user" modes, role assignment, activate/deactivate.
+5. ✅ DONE — **Reports/invoices → RPC calls**; **PDF in browser** — all `reports`/invoice mutations in
+   `api.ts` call `db().rpc(...)`; `src/lib/invoice-pdf.ts` renders PDFs client-side with `jspdf`.
+6. ❌ NOT STARTED — **Excel import** (`routes/migrate.ts`) — parse client-side (`xlsx`), insert via
+   supabase-js. No `xlsx`/SheetJS references anywhere in `src/` yet.
+7. ✅ DONE — **Schema version gate** — `checkSchemaVersion()` in `src/lib/supabase.ts` reads `schema_meta`.
 
 **Verify:** every screen exercised against a freshly re-seeded test project (real production data shape)
 with one login per role.
 
-## Phase 3 — Offline time entry + PWA
+## Phase 3 — Offline time entry + PWA — ❌ NOT STARTED
+
+No service worker, IndexedDB outbox, or offline UI code exists in `src/` yet.
 
 1. Service worker (`serwist` works with Next static export) precaching the app shell.
 2. Cache reference data (clients, job types, rate tiers, own recent entries) in IndexedDB on each load.
@@ -147,7 +156,11 @@ with one login per role.
    construction (users only queue their own entries), so last-write-wins is fine.
 4. Offline UI state: banner, disabled non-entry sections, queue count + retry.
 
-## Phase 4 — Static export + hosting
+## Phase 4 — Static export + hosting — ✅ DONE
+
+`next.config.ts` has `output: 'export'` with `basePath`/`trailingSlash` for GitHub Pages;
+`.github/workflows/deploy-pages.yml` builds and deploys on push to `main`. Demo mode (item 3 below) has
+not been redone for the static app — the old `DEMO_MODE` env var only applies to the legacy Hono backend.
 
 1. `output: 'export'` in `next.config.ts`; remove/replace anything incompatible (no dynamic API routes,
    no server actions; `NEXT_PUBLIC_API_URL` disappears with the REST client).
@@ -155,7 +168,9 @@ with one login per role.
    domain). Same URL for every org.
 3. Demo mode: point at a public demo Supabase project via a baked-in demo config, replacing `DEMO_MODE`.
 
-## Phase 5 — Cutover + retirement
+## Phase 5 — Cutover + retirement — ❌ NOT STARTED
+
+`packages/server`, `electron-app/`, and the NSIS/build pipeline are all still present in the repo.
 
 Runs only after the team agrees the new app is stable against test-project seeds.
 

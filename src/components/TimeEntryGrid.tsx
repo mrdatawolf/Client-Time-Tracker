@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, useSyncExternalStore } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, CheckSquare, Square, Receipt, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { timeEntries as timeEntriesApi, type TimeEntry } from '@/lib/api';
 import { toISODate, formatCurrency } from '@/lib/utils';
 import { isAdmin } from '@/lib/api-client';
+import { useIsMobile } from '@/lib/useIsMobile';
 import TimeEntryDialog from './TimeEntryDialog';
 
 interface TimeEntryGridProps {
@@ -16,15 +17,6 @@ interface TimeEntryGridProps {
 }
 
 const SHORT_DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-// SSR-safe mobile detection
-const MD_BREAKPOINT = 768;
-const subscribe = (cb: () => void) => { window.addEventListener('resize', cb); return () => window.removeEventListener('resize', cb); };
-const getIsMobile = () => window.innerWidth < MD_BREAKPOINT;
-const getIsMobileServer = () => false;
-function useIsMobile() {
-  return useSyncExternalStore(subscribe, getIsMobile, getIsMobileServer);
-}
 
 function getDatesInRange(from: string, to: string): Date[] {
   const dates: Date[] = [];
